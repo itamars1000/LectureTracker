@@ -1,0 +1,27 @@
+{
+  "name": "מעקב הרצאות ותרגולים",
+  "short_name": "מעקב הרצאות",
+  "description": "מעקב אחר הרצאות ותרגולים לאורך הסמסטר",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "lang": "he",
+  "dir": "rtl",
+  "orientation": "any",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

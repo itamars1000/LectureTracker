@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Course {
+  id               Int       @id @default(autoincrement())
+  name             String
+  totalWeeks       Int       @default(13)
+  weeklyLectures   Int
+  weeklyTutorials  Int
+  createdAt        DateTime  @default(now())
+  sessions         Session[]
+}
+
+model Session {
+  id        Int     @id @default(autoincrement())
+  courseId  Int
+  week      Int
+  type      String
+  number    Int
+  watched   Boolean @default(false)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
