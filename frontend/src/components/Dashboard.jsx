@@ -264,9 +264,8 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
       const scrollable = el.scrollWidth - el.clientWidth;
       if (trackWidth <= 0 || scrollable <= 0) return;
       const dx = cx - dragStartX.current;
-      // RTL: dragging right → scroll right (less negative), dragging left → more negative
       const scrollDelta = (dx / trackWidth) * el.scrollWidth;
-      el.scrollLeft = Math.max(-scrollable, Math.min(0, dragStartScroll.current - scrollDelta));
+      el.scrollLeft = Math.max(-scrollable, Math.min(0, dragStartScroll.current + scrollDelta));
       updateThumb();
     };
 
