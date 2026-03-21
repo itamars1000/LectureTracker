@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import CourseCard from './CourseCard.jsx';
 
 const TYPE_LABELS = { lecture: 'הרצאה', tutorial: 'תרגול' };
@@ -231,6 +231,25 @@ function WeeklyProgress({ weeklyStats, onWeekClick }) {
 // ── Week Picker ──────────────────────────────────────────────────────────────
 
 function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
+  const scrollRef = useRef(null);
+  const [thumbLeft, setThumbLeft] = useState(0);
+  const [thumbWidth, setThumbWidth] = useState(100);
+
+  const updateThumb = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollable = el.scrollWidth - el.clientWidth;
+    if (scrollable <= 0) { setThumbWidth(100); setThumbLeft(0); return; }
+    const w = (el.clientWidth / el.scrollWidth) * 100;
+    // RTL: scrollLeft is 0 at start (right), goes negative as you scroll left
+    const scrolled = -el.scrollLeft;
+    const ratio = Math.max(0, Math.min(1, scrolled / scrollable));
+    // Thumb starts at right (100-w)% and moves left to 0%
+    const left = (1 - ratio) * (100 - w);
+    setThumbWidth(w);
+    setThumbLeft(left);
+  }, []);
+
   const pills = [
     { key: 'all',       label: 'כל השבועות',   special: false },
     ...weeks.map((w) => ({ key: w, label: `שבוע ${w}`, special: false })),
@@ -238,37 +257,48 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
   ];
 
   return (
-    <div
-      className="flex gap-2 overflow-x-auto pb-1"
-      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-    >
-      {pills.map(({ key, label, special }) => {
-        const active = value === key;
-        const done = !special && key !== 'all' && completedWeeks.has(key);
-        return (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
-              active
-                ? special
-                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+    <div>
+      <div
+        ref={scrollRef}
+        onScroll={updateThumb}
+        className="flex gap-2 overflow-x-auto"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {pills.map(({ key, label, special }) => {
+          const active = value === key;
+          const done = !special && key !== 'all' && completedWeeks.has(key);
+          return (
+            <button
+              key={key}
+              onClick={() => onChange(key)}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                active
+                  ? special
+                    ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                    : done
+                    ? 'bg-emerald-600 border-emerald-600 text-white'
+                    : 'bg-indigo-600 border-indigo-600 text-white'
+                  : special
+                  ? 'bg-transparent border-amber-500/30 text-amber-400/70 hover:border-amber-500/60 hover:text-amber-300'
                   : done
-                  ? 'bg-emerald-600 border-emerald-600 text-white'
-                  : 'bg-indigo-600 border-indigo-600 text-white'
-                : special
-                ? 'bg-transparent border-amber-500/30 text-amber-400/70 hover:border-amber-500/60 hover:text-amber-300'
-                : done
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
-            }`}
-          >
-            {special && <span className="ml-1">⚑</span>}
-            {done && !active && <span className="ml-1">✓</span>}
-            {label}
-          </button>
-        );
-      })}
+                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+              }`}
+            >
+              {special && <span className="ml-1">⚑</span>}
+              {done && !active && <span className="ml-1">✓</span>}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {/* Custom scroll indicator */}
+      <div className="relative mt-1.5 h-0.5 bg-slate-700/60 rounded-full">
+        <div
+          className="absolute top-0 h-full bg-indigo-500/60 rounded-full transition-all duration-150"
+          style={{ width: `${thumbWidth}%`, left: `${thumbLeft}%` }}
+        />
+      </div>
     </div>
   );
 }
