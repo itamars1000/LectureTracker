@@ -20,12 +20,14 @@ function saveCourses(courses) {
 function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials) {
   const sessions = [];
   let id = Date.now();
+  let lectureNum = 1;
+  let tutorialNum = 1;
   for (let week = 1; week <= totalWeeks; week++) {
-    for (let n = 1; n <= weeklyLectures; n++) {
-      sessions.push({ id: id++, courseId, week, type: 'lecture', number: n, watched: false });
+    for (let i = 0; i < weeklyLectures; i++) {
+      sessions.push({ id: id++, courseId, week, type: 'lecture', number: lectureNum++, watched: false });
     }
-    for (let n = 1; n <= weeklyTutorials; n++) {
-      sessions.push({ id: id++, courseId, week, type: 'tutorial', number: n, watched: false });
+    for (let i = 0; i < weeklyTutorials; i++) {
+      sessions.push({ id: id++, courseId, week, type: 'tutorial', number: tutorialNum++, watched: false });
     }
   }
   return sessions;
