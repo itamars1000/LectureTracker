@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard.jsx';
 import CourseDetail from './components/CourseDetail.jsx';
 import CourseWizard from './components/CourseWizard.jsx';
+import TodosPage from './components/TodosPage.jsx';
 
 const STORAGE_KEY = 'lecture-tracker-v1';
 const TODOS_KEY = 'lecture-tracker-todos-v1';
@@ -52,6 +53,7 @@ export default function App() {
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
   const [weekFilter, setWeekFilter] = useState('all');
+  const [view, setView] = useState('dashboard'); // 'dashboard' | 'todos'
 
   useEffect(() => {
     saveCourses(courses);
@@ -129,16 +131,17 @@ export default function App() {
   const handleNavHome = () => {
     setSelectedCourseId(null);
     setWeekFilter('all');
+    setView('dashboard');
   };
-  const handleNavRemaining = () => {
+  const handleNavTodos = () => {
     setSelectedCourseId(null);
-    setWeekFilter('remaining');
+    setView('todos');
   };
 
   const navTab = selectedCourse
     ? 'course'
-    : weekFilter === 'remaining'
-    ? 'remaining'
+    : view === 'todos'
+    ? 'todos'
     : 'home';
 
   return (
@@ -159,7 +162,11 @@ export default function App() {
             )}
             <div>
               <h1 className="text-xl font-bold text-white">
-                {selectedCourse ? selectedCourse.name : 'מעקב הרצאות ותרגולים'}
+                {selectedCourse
+                  ? selectedCourse.name
+                  : view === 'todos'
+                  ? 'משימות'
+                  : 'מעקב הרצאות ותרגולים'}
               </h1>
               {selectedCourse && (
                 <p className="text-xs text-slate-400">חזרה ללוח הבקרה</p>
@@ -187,12 +194,20 @@ export default function App() {
             course={selectedCourse}
             onSessionToggle={handleSessionToggle}
           />
+        ) : view === 'todos' ? (
+          <TodosPage
+            todos={todos}
+            courses={courses}
+            onAddTodo={handleAddTodo}
+            onToggleTodo={handleToggleTodo}
+            onDeleteTodo={handleDeleteTodo}
+          />
         ) : (
           <Dashboard
             courses={courses}
             weekFilter={weekFilter}
             onWeekFilterChange={setWeekFilter}
-            onSelectCourse={(course) => setSelectedCourseId(course.id)}
+            onSelectCourse={(course) => { setSelectedCourseId(course.id); setView('dashboard'); }}
             onDeleteCourse={handleDeleteCourse}
             onAddCourse={() => setShowWizard(true)}
             onSessionToggle={handleSessionToggle}
@@ -209,7 +224,7 @@ export default function App() {
         tab={navTab}
         onHome={handleNavHome}
         onAdd={() => setShowWizard(true)}
-        onRemaining={handleNavRemaining}
+        onTodos={handleNavTodos}
       />
 
       {/* Wizard Modal */}
@@ -223,7 +238,7 @@ export default function App() {
   );
 }
 
-function BottomNav({ tab, onHome, onAdd, onRemaining }) {
+function BottomNav({ tab, onHome, onAdd, onTodos }) {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-20 bg-slate-800/95 backdrop-blur border-t border-slate-700 shadow-2xl">
       <div className="max-w-6xl mx-auto flex items-center justify-around h-16 px-4">
@@ -255,11 +270,11 @@ function BottomNav({ tab, onHome, onAdd, onRemaining }) {
           </svg>
         </button>
 
-        {/* נותרו */}
+        {/* משימות */}
         <button
-          onClick={onRemaining}
+          onClick={onTodos}
           className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${
-            tab === 'remaining'
+            tab === 'todos'
               ? 'text-amber-400'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -268,7 +283,7 @@ function BottomNav({ tab, onHome, onAdd, onRemaining }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
-          <span className="text-xs font-medium">נותרו</span>
+          <span className="text-xs font-medium">משימות</span>
         </button>
 
       </div>
