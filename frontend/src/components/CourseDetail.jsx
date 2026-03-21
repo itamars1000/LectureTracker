@@ -109,7 +109,7 @@ export default function CourseDetail({ course, onSessionToggle }) {
       </div>
 
       {/* ── Sticky filter bar ───────────────────────────────────────────── */}
-      <div className="sticky top-[68px] z-10 bg-slate-900 pt-1 pb-3 space-y-3">
+      <div className="pt-1 pb-3 space-y-3">
         {/* Week Picker */}
         <WeekPicker
           weeks={allWeeks}
