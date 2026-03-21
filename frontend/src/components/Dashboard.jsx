@@ -396,7 +396,6 @@ function DashboardSessionRow({ session, onToggle }) {
       <div className="relative flex-shrink-0">
         <input type="checkbox" checked={session.watched} onChange={handleToggle} disabled={pending} className="sr-only" />
         <div
-          onClick={handleToggle}
           className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
             session.watched ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500 group-hover:border-slate-400'
           } ${pending ? 'opacity-50' : ''}`}
