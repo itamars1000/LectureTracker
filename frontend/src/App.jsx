@@ -1,63 +1,83 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard.jsx';
 import CourseDetail from './components/CourseDetail.jsx';
 import CourseWizard from './components/CourseWizard.jsx';
 
-const API = '/api';
+const STORAGE_KEY = 'lecture-tracker-v1';
+
+function loadCourses() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCourses(courses) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
+}
+
+function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials) {
+  const sessions = [];
+  let id = Date.now(); // unique enough for localStorage
+  for (let week = 1; week <= totalWeeks; week++) {
+    for (let n = 1; n <= weeklyLectures; n++) {
+      sessions.push({ id: id++, courseId, week, type: 'lecture', number: n, watched: false });
+    }
+    for (let n = 1; n <= weeklyTutorials; n++) {
+      sessions.push({ id: id++, courseId, week, type: 'tutorial', number: n, watched: false });
+    }
+  }
+  return sessions;
+}
 
 export default function App() {
-  const [courses, setCourses] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [courses, setCourses] = useState(() => loadCourses());
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const fetchCourses = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/courses`);
-      const data = await res.json();
-      setCourses(data);
-    } catch (e) {
-      console.error('Failed to fetch courses', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses]);
+    saveCourses(courses);
+  }, [courses]);
 
-  const handleCreateCourse = async (formData) => {
-    const res = await fetch(`${API}/courses`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
-    const created = await res.json();
-    setCourses((prev) => [created, ...prev]);
+  const selectedCourse = selectedCourseId
+    ? courses.find((c) => c.id === selectedCourseId) ?? null
+    : null;
+
+  const handleCreateCourse = (formData) => {
+    const id = Date.now();
+    const sessions = generateSessions(
+      id,
+      formData.totalWeeks,
+      formData.weeklyLectures,
+      formData.weeklyTutorials,
+    );
+    const newCourse = {
+      id,
+      name: formData.name,
+      totalWeeks: formData.totalWeeks,
+      weeklyLectures: formData.weeklyLectures,
+      weeklyTutorials: formData.weeklyTutorials,
+      createdAt: new Date().toISOString(),
+      sessions,
+      watched: 0,
+    };
+    setCourses((prev) => [newCourse, ...prev]);
     setShowWizard(false);
   };
 
-  const handleDeleteCourse = async (id) => {
-    await fetch(`${API}/courses/${id}`, { method: 'DELETE' });
+  const handleDeleteCourse = (id) => {
     setCourses((prev) => prev.filter((c) => c.id !== id));
-    if (selectedCourse?.id === id) setSelectedCourse(null);
+    if (selectedCourseId === id) setSelectedCourseId(null);
   };
 
-  const handleSessionToggle = async (sessionId, watched) => {
-    const res = await fetch(`${API}/sessions/${sessionId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ watched }),
-    });
-    const updated = await res.json();
-
-    // Update courses list progress counts
+  const handleSessionToggle = (sessionId, watched) => {
     setCourses((prev) =>
       prev.map((c) => {
-        if (c.id !== updated.courseId) return c;
+        const idx = c.sessions.findIndex((s) => s.id === sessionId);
+        if (idx === -1) return c;
         const sessions = c.sessions.map((s) =>
-          s.id === updated.id ? updated : s
+          s.id === sessionId ? { ...s, watched } : s
         );
         return {
           ...c,
@@ -66,20 +86,6 @@ export default function App() {
         };
       })
     );
-
-    // Update selected course sessions if open
-    if (selectedCourse?.id === updated.courseId) {
-      setSelectedCourse((prev) => ({
-        ...prev,
-        sessions: prev.sessions.map((s) =>
-          s.id === updated.id ? updated : s
-        ),
-      }));
-    }
-  };
-
-  const openCourse = (course) => {
-    setSelectedCourse(course);
   };
 
   return (
@@ -90,7 +96,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             {selectedCourse && (
               <button
-                onClick={() => setSelectedCourse(null)}
+                onClick={() => setSelectedCourseId(null)}
                 className="text-slate-400 hover:text-white transition-colors p-1 rounded"
               >
                 <svg className="w-5 h-5 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,11 +129,7 @@ export default function App() {
 
       {/* Main */}
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : selectedCourse ? (
+        {selectedCourse ? (
           <CourseDetail
             course={selectedCourse}
             onSessionToggle={handleSessionToggle}
@@ -135,7 +137,7 @@ export default function App() {
         ) : (
           <Dashboard
             courses={courses}
-            onSelectCourse={openCourse}
+            onSelectCourse={(course) => setSelectedCourseId(course.id)}
             onDeleteCourse={handleDeleteCourse}
             onAddCourse={() => setShowWizard(true)}
             onSessionToggle={handleSessionToggle}
