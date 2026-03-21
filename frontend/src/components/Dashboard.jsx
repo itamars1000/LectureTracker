@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
 import CourseCard from './CourseCard.jsx';
+import TodoPanel from './TodoPanel.jsx';
 
 const TYPE_LABELS = { lecture: 'הרצאה', tutorial: 'תרגול' };
 const TYPE_COLORS = {
@@ -15,6 +16,10 @@ export default function Dashboard({
   onDeleteCourse,
   onAddCourse,
   onSessionToggle,
+  todos = [],
+  onAddTodo,
+  onToggleTodo,
+  onDeleteTodo,
 }) {
   const setWeekFilter = onWeekFilterChange;
 
@@ -124,6 +129,16 @@ export default function Dashboard({
           <WeekPicker weeks={allWeeks} value={weekFilter} onChange={setWeekFilter} completedWeeks={completedWeeks} />
         </div>
       )}
+
+      {/* ── Task Center ──────────────────────────────────────────────── */}
+      <TodoPanel
+        todos={todos}
+        courses={courses}
+        weekFilter={weekFilter}
+        onAddTodo={onAddTodo}
+        onToggleTodo={onToggleTodo}
+        onDeleteTodo={onDeleteTodo}
+      />
 
       {/* ── Content area ─────────────────────────────────────────────── */}
       {courses.length === 0 ? (

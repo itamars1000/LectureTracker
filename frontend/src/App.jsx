@@ -4,6 +4,7 @@ import CourseDetail from './components/CourseDetail.jsx';
 import CourseWizard from './components/CourseWizard.jsx';
 
 const STORAGE_KEY = 'lecture-tracker-v1';
+const TODOS_KEY = 'lecture-tracker-todos-v1';
 
 function loadCourses() {
   try {
@@ -15,6 +16,18 @@ function loadCourses() {
 
 function saveCourses(courses) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
+}
+
+function loadTodos() {
+  try {
+    return JSON.parse(localStorage.getItem(TODOS_KEY)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTodos(todos) {
+  localStorage.setItem(TODOS_KEY, JSON.stringify(todos));
 }
 
 function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials) {
@@ -35,6 +48,7 @@ function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials)
 
 export default function App() {
   const [courses, setCourses] = useState(() => loadCourses());
+  const [todos, setTodos] = useState(() => loadTodos());
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
   const [weekFilter, setWeekFilter] = useState('all');
@@ -42,6 +56,10 @@ export default function App() {
   useEffect(() => {
     saveCourses(courses);
   }, [courses]);
+
+  useEffect(() => {
+    saveTodos(todos);
+  }, [todos]);
 
   const selectedCourse = selectedCourseId
     ? courses.find((c) => c.id === selectedCourseId) ?? null
@@ -73,6 +91,21 @@ export default function App() {
   const handleDeleteCourse = (id) => {
     setCourses((prev) => prev.filter((c) => c.id !== id));
     if (selectedCourseId === id) setSelectedCourseId(null);
+  };
+
+  const handleAddTodo = ({ description, linkedCourseId, linkedWeek }) => {
+    setTodos((prev) => [
+      ...prev,
+      { id: Date.now(), description, linkedCourseId, linkedWeek, done: false, createdAt: new Date().toISOString() },
+    ]);
+  };
+
+  const handleToggleTodo = (id, done) => {
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done } : t)));
+  };
+
+  const handleDeleteTodo = (id) => {
+    setTodos((prev) => prev.filter((t) => t.id !== id));
   };
 
   const handleSessionToggle = (sessionId, watched) => {
@@ -163,6 +196,10 @@ export default function App() {
             onDeleteCourse={handleDeleteCourse}
             onAddCourse={() => setShowWizard(true)}
             onSessionToggle={handleSessionToggle}
+            todos={todos}
+            onAddTodo={handleAddTodo}
+            onToggleTodo={handleToggleTodo}
+            onDeleteTodo={handleDeleteTodo}
           />
         )}
       </main>
