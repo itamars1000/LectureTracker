@@ -60,6 +60,7 @@ export default function App() {
       weeklyTutorials: formData.weeklyTutorials,
       createdAt: new Date().toISOString(),
       sessions,
+      total: sessions.length,
       watched: 0,
     };
     setCourses((prev) => [newCourse, ...prev]);
