@@ -9,12 +9,14 @@ const TYPE_COLORS = {
 
 export default function Dashboard({
   courses,
+  weekFilter,
+  onWeekFilterChange,
   onSelectCourse,
   onDeleteCourse,
   onAddCourse,
   onSessionToggle,
 }) {
-  const [weekFilter, setWeekFilter] = useState('all');
+  const setWeekFilter = onWeekFilterChange;
 
   const totalSessions = courses.reduce((sum, c) => sum + c.total, 0);
   const totalWatched  = courses.reduce((sum, c) => sum + c.watched, 0);
