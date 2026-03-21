@@ -232,8 +232,12 @@ function WeeklyProgress({ weeklyStats, onWeekClick }) {
 
 function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
   const scrollRef = useRef(null);
+  const trackRef = useRef(null);
   const [thumbLeft, setThumbLeft] = useState(0);
   const [thumbWidth, setThumbWidth] = useState(100);
+  const [dragging, setDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const dragStartScroll = useRef(0);
 
   const updateThumb = useCallback(() => {
     const el = scrollRef.current;
@@ -241,14 +245,45 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
     const scrollable = el.scrollWidth - el.clientWidth;
     if (scrollable <= 0) { setThumbWidth(100); setThumbLeft(0); return; }
     const w = (el.clientWidth / el.scrollWidth) * 100;
-    // RTL: scrollLeft is 0 at start (right), goes negative as you scroll left
-    const scrolled = -el.scrollLeft;
+    const scrolled = -el.scrollLeft; // RTL: scrollLeft is negative when scrolled left
     const ratio = Math.max(0, Math.min(1, scrolled / scrollable));
-    // Thumb starts at right (100-w)% and moves left to 0%
-    const left = (1 - ratio) * (100 - w);
     setThumbWidth(w);
-    setThumbLeft(left);
+    setThumbLeft((1 - ratio) * (100 - w));
   }, []);
+
+  const startDrag = useCallback((clientX) => {
+    const el = scrollRef.current;
+    const track = trackRef.current;
+    if (!el || !track) return;
+    setDragging(true);
+    dragStartX.current = clientX;
+    dragStartScroll.current = el.scrollLeft;
+
+    const onMove = (cx) => {
+      const trackWidth = track.getBoundingClientRect().width;
+      const scrollable = el.scrollWidth - el.clientWidth;
+      if (trackWidth <= 0 || scrollable <= 0) return;
+      const dx = cx - dragStartX.current;
+      // RTL: dragging right → scroll right (less negative), dragging left → more negative
+      const scrollDelta = (dx / trackWidth) * el.scrollWidth;
+      el.scrollLeft = Math.max(-scrollable, Math.min(0, dragStartScroll.current - scrollDelta));
+      updateThumb();
+    };
+
+    const onMouseMove = (e) => onMove(e.clientX);
+    const onTouchMove = (e) => onMove(e.touches[0].clientX);
+    const stop = () => {
+      setDragging(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', stop);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', stop);
+  }, [updateThumb]);
 
   const pills = [
     { key: 'all',       label: 'כל השבועות',   special: false },
@@ -292,11 +327,31 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
           );
         })}
       </div>
-      {/* Custom scroll indicator */}
-      <div className="relative mt-1.5 h-0.5 bg-slate-700/60 rounded-full">
+
+      {/* Draggable scroll indicator */}
+      <div
+        ref={trackRef}
+        className="relative mt-2 h-1.5 bg-slate-700/60 rounded-full cursor-pointer"
+        onClick={(e) => {
+          // Click on track → jump scroll to that position
+          const el = scrollRef.current;
+          const track = trackRef.current;
+          if (!el || !track) return;
+          const rect = track.getBoundingClientRect();
+          const clickRatio = (e.clientX - rect.left) / rect.width;
+          const scrollable = el.scrollWidth - el.clientWidth;
+          // RTL: 0 = right (start), 1 = left (end) → invert
+          el.scrollLeft = -(1 - clickRatio) * scrollable;
+          updateThumb();
+        }}
+      >
         <div
-          className="absolute top-0 h-full bg-indigo-500/60 rounded-full transition-all duration-150"
+          className={`absolute top-0 h-full rounded-full transition-[width] duration-150 ${
+            dragging ? 'bg-indigo-400 cursor-grabbing' : 'bg-indigo-500/70 hover:bg-indigo-400 cursor-grab'
+          }`}
           style={{ width: `${thumbWidth}%`, left: `${thumbLeft}%` }}
+          onMouseDown={(e) => { e.preventDefault(); startDrag(e.clientX); }}
+          onTouchStart={(e) => startDrag(e.touches[0].clientX)}
         />
       </div>
     </div>
