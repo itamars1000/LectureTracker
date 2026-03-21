@@ -499,7 +499,6 @@ function DashboardSessionRow({ session, onToggle }) {
         </span>
         <span className={`text-sm truncate ${session.watched ? 'line-through text-slate-500' : 'text-slate-200'}`}>
           {TYPE_LABELS[session.type]} {session.number}
-          {session.type === 'lecture' ? '' : ` — שבוע ${session.week}`}
         </span>
       </div>
       {session.watched && (

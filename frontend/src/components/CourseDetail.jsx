@@ -345,7 +345,7 @@ function SessionRow({ session, onToggle }) {
         <span
           className={`text-sm ${session.watched ? 'line-through text-slate-500' : 'text-slate-200'}`}
         >
-          {TYPE_LABELS[session.type]} {session.number} — שבוע {session.week}
+          {TYPE_LABELS[session.type]} {session.number}
         </span>
       </div>
     </label>
