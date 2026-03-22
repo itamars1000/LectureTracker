@@ -17,11 +17,10 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete 
   const watched = sessions.filter((s) => s.watched).length;
   const pct = total > 0 ? Math.round((watched / total) * 100) : 0;
 
-  // All distinct week numbers sorted ascending
+  // All week numbers 1..totalWeeks — fixed range so deleted-all weeks still appear
   const allWeeks = useMemo(() => {
-    const set = new Set(sessions.map((s) => s.week));
-    return [...set].sort((a, b) => a - b);
-  }, [sessions]);
+    return Array.from({ length: course.totalWeeks }, (_, i) => i + 1);
+  }, [course.totalWeeks]);
 
   // Weeks where every session in this course is watched
   const completedWeeks = useMemo(() => {
@@ -63,7 +62,8 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete 
 
         return { week, sessions: list };
       })
-      .filter((w) => w.sessions.length > 0);
+      // for 'remaining' skip empty weeks; for all/week-number keep them so the week block is always visible
+      .filter((w) => weekFilter === 'remaining' ? w.sessions.length > 0 : true);
   }, [byWeek, allWeeks, weekFilter, typeFilter]);
 
   const handleWeekFilter = (val) => {
@@ -156,7 +156,7 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete 
                 key={week}
                 week={week}
                 sessions={ws}
-                weekDone={ww === wt}
+                weekDone={wt > 0 && ww === wt}
                 weekWatched={ww}
                 weekTotal={wt}
                 // Auto-expand when a specific week is pinned
@@ -291,11 +291,17 @@ function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOp
       </button>
 
       {open && (
-        <div className="border-t border-slate-700 divide-y divide-slate-700/50">
-          {sessions.map((s) => (
-            <SessionRow key={s.id} session={s} onToggle={onToggle} onDelete={onDelete} />
-          ))}
-        </div>
+        sessions.length === 0 ? (
+          <div className="border-t border-slate-700 px-5 py-4 text-center text-sm text-slate-500">
+            אין שיעורים בשבוע זה
+          </div>
+        ) : (
+          <div className="border-t border-slate-700 divide-y divide-slate-700/50">
+            {sessions.map((s) => (
+              <SessionRow key={s.id} session={s} onToggle={onToggle} onDelete={onDelete} />
+            ))}
+          </div>
+        )
       )}
     </div>
   );
