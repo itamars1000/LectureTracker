@@ -124,9 +124,9 @@ export default function Dashboard({
         />
       )}
 
-      {/* Week Picker — sticky, only shown when there are courses */}
+      {/* Week Picker — sticky below the header, between stats and task center */}
       {courses.length > 0 && (
-        <div className="sticky top-[61px] z-10 bg-slate-900 py-2">
+        <div className="sticky top-[69px] z-10 bg-slate-900 py-2">
           <WeekPicker weeks={allWeeks} value={weekFilter} onChange={setWeekFilter} completedWeeks={completedWeeks} />
         </div>
       )}
