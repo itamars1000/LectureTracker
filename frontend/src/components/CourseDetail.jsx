@@ -305,12 +305,23 @@ function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOp
 
 function SessionRow({ session, onToggle, onDelete }) {
   const [pending, setPending] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleToggle = async () => {
     if (pending) return;
     setPending(true);
     await onToggle(session.id, !session.watched);
     setPending(false);
+  };
+
+  const handleDelete = (e) => {
+    e.preventDefault();
+    if (confirmDelete) {
+      onDelete(session.id);
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
   };
 
   return (
@@ -351,13 +362,19 @@ function SessionRow({ session, onToggle, onDelete }) {
       </div>
       <button
         type="button"
-        onClick={(e) => { e.preventDefault(); onDelete(session.id); }}
-        className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all"
-        title="מחק שיעור"
+        onClick={handleDelete}
+        className={`flex-shrink-0 transition-all text-xs rounded-lg px-2 py-0.5 ${
+          confirmDelete
+            ? 'bg-red-500 text-white'
+            : 'opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400'
+        }`}
+        title={confirmDelete ? 'לחץ שוב לאישור' : 'מחק שיעור'}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
+        {confirmDelete ? 'מחק?' : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        )}
       </button>
     </label>
   );

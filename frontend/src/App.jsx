@@ -227,6 +227,7 @@ export default function App() {
             onDeleteCourse={handleDeleteCourse}
             onAddCourse={() => setShowWizard(true)}
             onSessionToggle={handleSessionToggle}
+            onSessionDelete={handleDeleteSession}
             todos={todos}
             onAddTodo={handleAddTodo}
             onToggleTodo={handleToggleTodo}

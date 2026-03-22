@@ -16,6 +16,7 @@ export default function Dashboard({
   onDeleteCourse,
   onAddCourse,
   onSessionToggle,
+  onSessionDelete,
   todos = [],
   onAddTodo,
   onToggleTodo,
@@ -148,6 +149,7 @@ export default function Dashboard({
           groups={filteredGroups}
           weekFilter={weekFilter}
           onSessionToggle={onSessionToggle}
+          onSessionDelete={onSessionDelete}
           onSelectCourse={onSelectCourse}
         />
       ) : (
@@ -374,7 +376,7 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
 
 // ── Filtered cross-course view ───────────────────────────────────────────────
 
-function FilteredView({ groups, weekFilter, onSessionToggle, onSelectCourse }) {
+function FilteredView({ groups, weekFilter, onSessionToggle, onSessionDelete, onSelectCourse }) {
   if (groups.length === 0) {
     return (
       <div className="text-center py-16">
@@ -409,6 +411,7 @@ function FilteredView({ groups, weekFilter, onSessionToggle, onSelectCourse }) {
           course={course}
           sessions={sessions}
           onSessionToggle={onSessionToggle}
+          onSessionDelete={onSessionDelete}
           onSelectCourse={onSelectCourse}
         />
       ))}
@@ -418,7 +421,7 @@ function FilteredView({ groups, weekFilter, onSessionToggle, onSelectCourse }) {
 
 // ── Per-course block in filtered view ────────────────────────────────────────
 
-function CourseWeekBlock({ course, sessions, onSessionToggle, onSelectCourse }) {
+function CourseWeekBlock({ course, sessions, onSessionToggle, onSessionDelete, onSelectCourse }) {
   const [open, setOpen] = useState(true);
   const watchedCount = sessions.filter((s) => s.watched).length;
   const allDone = watchedCount === sessions.length;
@@ -472,7 +475,7 @@ function CourseWeekBlock({ course, sessions, onSessionToggle, onSelectCourse }) 
       {open && (
         <div className="border-t border-slate-700 divide-y divide-slate-700/50">
           {sessions.map((s) => (
-            <DashboardSessionRow key={s.id} session={s} onToggle={onSessionToggle} />
+            <DashboardSessionRow key={s.id} session={s} onToggle={onSessionToggle} onDelete={onSessionDelete} />
           ))}
         </div>
       )}
@@ -482,14 +485,25 @@ function CourseWeekBlock({ course, sessions, onSessionToggle, onSelectCourse }) 
 
 // ── Session row (inline toggle, no navigation needed) ────────────────────────
 
-function DashboardSessionRow({ session, onToggle }) {
+function DashboardSessionRow({ session, onToggle, onDelete }) {
   const [pending, setPending] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleToggle = async () => {
     if (pending) return;
     setPending(true);
     await onToggle(session.id, !session.watched);
     setPending(false);
+  };
+
+  const handleDelete = (e) => {
+    e.preventDefault();
+    if (confirmDelete) {
+      onDelete(session.id);
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
   };
 
   return (
@@ -516,9 +530,25 @@ function DashboardSessionRow({ session, onToggle }) {
           {TYPE_LABELS[session.type]} {session.number}
         </span>
       </div>
-      {session.watched && (
+      {session.watched && !confirmDelete && (
         <span className="text-xs text-emerald-500 flex-shrink-0">✓ נצפה</span>
       )}
+      <button
+        type="button"
+        onClick={handleDelete}
+        className={`flex-shrink-0 transition-all text-xs rounded-lg px-2 py-0.5 ${
+          confirmDelete
+            ? 'bg-red-500 text-white'
+            : 'opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400'
+        }`}
+        title={confirmDelete ? 'לחץ שוב לאישור' : 'מחק שיעור'}
+      >
+        {confirmDelete ? 'מחק?' : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        )}
+      </button>
     </label>
   );
 }
