@@ -127,6 +127,21 @@ export default function App() {
     );
   };
 
+  const handleDeleteSession = (sessionId) => {
+    setCourses((prev) =>
+      prev.map((c) => {
+        const sessions = c.sessions.filter((s) => s.id !== sessionId);
+        if (sessions.length === c.sessions.length) return c;
+        return {
+          ...c,
+          sessions,
+          total: sessions.length,
+          watched: sessions.filter((s) => s.watched).length,
+        };
+      })
+    );
+  };
+
   // Bottom nav tab handler
   const handleNavHome = () => {
     setSelectedCourseId(null);
@@ -193,6 +208,7 @@ export default function App() {
           <CourseDetail
             course={selectedCourse}
             onSessionToggle={handleSessionToggle}
+            onSessionDelete={handleDeleteSession}
           />
         ) : view === 'todos' ? (
           <TodosPage

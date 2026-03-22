@@ -6,7 +6,7 @@ const TYPE_COLORS = {
   tutorial: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
 };
 
-export default function CourseDetail({ course, onSessionToggle }) {
+export default function CourseDetail({ course, onSessionToggle, onSessionDelete }) {
   // 'all' | 'lecture' | 'tutorial'
   const [typeFilter, setTypeFilter] = useState('all');
   // 'all' | 'remaining' | 1..N (number)
@@ -162,6 +162,7 @@ export default function CourseDetail({ course, onSessionToggle }) {
                 // Auto-expand when a specific week is pinned
                 defaultOpen={typeof weekFilter === 'number' || weekFilter === 'remaining'}
                 onToggle={onSessionToggle}
+                onDelete={onSessionDelete}
               />
             );
           })
@@ -244,7 +245,7 @@ function EmptyState({ weekFilter }) {
 
 // ── Week Block ───────────────────────────────────────────────────────────────
 
-function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOpen, onToggle }) {
+function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOpen, onToggle, onDelete }) {
   const [open, setOpen] = useState(defaultOpen ?? true);
 
   return (
@@ -292,7 +293,7 @@ function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOp
       {open && (
         <div className="border-t border-slate-700 divide-y divide-slate-700/50">
           {sessions.map((s) => (
-            <SessionRow key={s.id} session={s} onToggle={onToggle} />
+            <SessionRow key={s.id} session={s} onToggle={onToggle} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -302,7 +303,7 @@ function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOp
 
 // ── Session Row ──────────────────────────────────────────────────────────────
 
-function SessionRow({ session, onToggle }) {
+function SessionRow({ session, onToggle, onDelete }) {
   const [pending, setPending] = useState(false);
 
   const handleToggle = async () => {
@@ -348,6 +349,16 @@ function SessionRow({ session, onToggle }) {
           {TYPE_LABELS[session.type]} {session.number}
         </span>
       </div>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); onDelete(session.id); }}
+        className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all"
+        title="מחק שיעור"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </label>
   );
 }
