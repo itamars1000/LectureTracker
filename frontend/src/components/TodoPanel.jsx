@@ -10,7 +10,7 @@ export default function TodoPanel({ todos, courses, weekFilter, onAddTodo, onTog
   // Weeks available for the selected course
   const courseWeeks = linkedCourseId
     ? [...new Set(
-        (courses.find((c) => c.id === Number(linkedCourseId))?.sessions ?? []).map((s) => s.week)
+        (courses.find((c) => c.id === linkedCourseId)?.sessions ?? []).map((s) => s.week)
       )].sort((a, b) => a - b)
     : [];
 
@@ -37,7 +37,7 @@ export default function TodoPanel({ todos, courses, weekFilter, onAddTodo, onTog
     if (!trimmed) return;
     onAddTodo({
       description: trimmed,
-      linkedCourseId: linkedCourseId ? Number(linkedCourseId) : null,
+      linkedCourseId: linkedCourseId || null,
       linkedWeek: linkedWeek ? Number(linkedWeek) : null,
     });
     setDesc('');
