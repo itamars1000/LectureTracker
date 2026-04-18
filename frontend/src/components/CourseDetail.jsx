@@ -6,7 +6,7 @@ const TYPE_COLORS = {
   tutorial: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
 };
 
-export default function CourseDetail({ course, onSessionToggle, onSessionDelete, onEditCourse }) {
+export default function CourseDetail({ course, onSessionToggle, onSessionDelete }) {
   // 'all' | 'lecture' | 'tutorial'
   const [typeFilter, setTypeFilter] = useState('all');
   // 'all' | 'remaining' | 1..N (number)
@@ -130,7 +130,7 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete,
 
         {/* Type filter — hidden when "remaining" is active (redundant there) */}
         {weekFilter !== 'remaining' && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {[
               { key: 'all', label: 'הכל' },
               { key: 'lecture', label: 'הרצאות' },
@@ -139,15 +139,21 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete,
               <button
                 key={f.key}
                 onClick={() => setTypeFilter(f.key)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  typeFilter === f.key
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${typeFilter === f.key
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
+                  }`}
               >
                 {f.label}
               </button>
             ))}
+
+            <button
+              onClick={() => handleOpenAddModal()}
+              className="px-4 py-1.5 rounded-full text-sm font-medium border border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white transition-all mr-auto"
+            >
+              + הוסף חריג
+            </button>
           </div>
         )}
       </div>
@@ -173,10 +179,87 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete,
                 defaultOpen={typeof weekFilter === 'number' || weekFilter === 'remaining'}
                 onToggle={onSessionToggle}
                 onDelete={onSessionDelete}
+                onAddExtra={() => handleOpenAddModal(week)}
               />
             );
           })
         )}
+      </div>
+
+      {showAddModal && (
+        <AddExtraSessionModal
+          course={course}
+          defaultWeek={addModalWeek}
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleAddSubmit}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Add Extra Session Modal ──────────────────────────────────────────────────
+
+function AddExtraSessionModal({ course, defaultWeek, onClose, onSubmit }) {
+  const [week, setWeek] = useState(defaultWeek || course.totalWeeks || 1);
+  const [type, setType] = useState('lecture');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(week, type);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-700">
+          <h2 className="text-lg font-bold text-white">הוספת שיעור חריג</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1 rounded">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">הוסף לשבוע</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={week}
+              onChange={(e) => setWeek(Number(e.target.value))}
+              className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-2.5 text-white outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">סוג שיעור</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setType('lecture')}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${type === 'lecture' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}
+              >
+                הרצאה
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('tutorial')}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${type === 'tutorial' ? 'bg-violet-600 border-violet-600 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}
+              >
+                תרגול
+              </button>
+            </div>
+          </div>
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl font-medium transition-colors"
+            >
+              הוסף שיעור
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -207,19 +290,18 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
           <button
             key={key}
             onClick={() => onChange(key)}
-            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all border ${
-              active
+            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all border ${active
                 ? isRemaining
                   ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                   : done
-                  ? 'bg-emerald-600 border-emerald-600 text-white'
-                  : 'bg-indigo-600 border-indigo-600 text-white'
+                    ? 'bg-emerald-600 border-emerald-600 text-white'
+                    : 'bg-indigo-600 border-indigo-600 text-white'
                 : isRemaining
-                ? 'bg-transparent border-amber-500/30 text-amber-400/70 hover:border-amber-500/60 hover:text-amber-300'
-                : done
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
-            }`}
+                  ? 'bg-transparent border-amber-500/30 text-amber-400/70 hover:border-amber-500/60 hover:text-amber-300'
+                  : done
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                    : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+              }`}
           >
             {isRemaining && (
               <span className="ml-1">⚑</span>
@@ -255,14 +337,13 @@ function EmptyState({ weekFilter }) {
 
 // ── Week Block ───────────────────────────────────────────────────────────────
 
-function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOpen, onToggle, onDelete }) {
+function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOpen, onToggle, onDelete, onAddExtra }) {
   const [open, setOpen] = useState(defaultOpen ?? true);
 
   return (
     <div
-      className={`bg-slate-800 border rounded-2xl overflow-hidden shadow-sm transition-colors ${
-        weekDone ? 'border-emerald-500/30' : 'border-slate-700'
-      }`}
+      className={`bg-slate-800 border rounded-2xl overflow-hidden shadow-sm transition-colors ${weekDone ? 'border-emerald-500/30' : 'border-slate-700'
+        }`}
     >
       <button
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/30 transition-colors"
@@ -270,11 +351,10 @@ function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOp
       >
         <div className="flex items-center gap-3">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              weekDone
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${weekDone
                 ? 'bg-emerald-500/20 text-emerald-400'
                 : 'bg-slate-700 text-slate-300'
-            }`}
+              }`}
           >
             {weekDone ? '✓' : week}
           </div>
@@ -302,14 +382,32 @@ function WeekBlock({ week, sessions, weekDone, weekWatched, weekTotal, defaultOp
 
       {open && (
         sessions.length === 0 ? (
-          <div className="border-t border-slate-700 px-5 py-4 text-center text-sm text-slate-500">
-            אין שיעורים בשבוע זה
+          <div className="px-5 py-4 flex flex-col items-center justify-center gap-2 border-t border-slate-700">
+            <div className="text-sm text-slate-500">אין שיעורים בשבוע זה</div>
+            {onAddExtra && (
+              <button
+                onClick={onAddExtra}
+                className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg transition-colors border border-slate-600"
+              >
+                + הוסף שיעור
+              </button>
+            )}
           </div>
         ) : (
           <div className="border-t border-slate-700 divide-y divide-slate-700/50">
             {sessions.map((s) => (
               <SessionRow key={s.id} session={s} onToggle={onToggle} onDelete={onDelete} />
             ))}
+            {onAddExtra && (
+              <div className="px-5 py-3 bg-slate-800/30">
+                <button
+                  onClick={onAddExtra}
+                  className="text-xs text-slate-400 hover:text-indigo-400 transition-colors flex items-center gap-1 font-medium"
+                >
+                  <span className="text-lg leading-none mb-0.5">+</span> הוסף שיעור
+                </button>
+              </div>
+            )}
           </div>
         )
       )}
@@ -352,11 +450,10 @@ function SessionRow({ session, onToggle, onDelete }) {
         />
         <div
           onClick={handleToggle}
-          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-            session.watched
+          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${session.watched
               ? 'bg-emerald-500 border-emerald-500'
               : 'bg-transparent border-slate-500 group-hover:border-slate-400'
-          } ${pending ? 'opacity-50' : ''}`}
+            } ${pending ? 'opacity-50' : ''}`}
         >
           {session.watched && (
             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -379,11 +476,10 @@ function SessionRow({ session, onToggle, onDelete }) {
       <button
         type="button"
         onClick={handleDelete}
-        className={`flex-shrink-0 transition-all text-xs rounded-lg px-2 py-0.5 ${
-          confirmDelete
+        className={`flex-shrink-0 transition-all text-xs rounded-lg px-2 py-0.5 ${confirmDelete
             ? 'bg-red-500 text-white'
             : 'opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400'
-        }`}
+          }`}
         title={confirmDelete ? 'לחץ שוב לאישור' : 'מחק שיעור'}
       >
         {confirmDelete ? 'מחק?' : (

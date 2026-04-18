@@ -41,20 +41,20 @@ function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials)
 
 export default function App() {
   // Auth state: undefined = still checking, null = logged out, object = logged in
-  const [session, setSession]         = useState(undefined);
-  const [authError, setAuthError]     = useState('');
+  const [session, setSession] = useState(undefined);
+  const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
   // Data state — populated from Supabase after session is confirmed
   const [courses, setCourses] = useState([]);
-  const [todos,   setTodos]   = useState([]);
+  const [todos, setTodos] = useState([]);
 
   // UI state
   const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const [showWizard,        setShowWizard]        = useState(false);
-  const [editingCourse,     setEditingCourse]     = useState(null); // course object or null
-  const [weekFilter,        setWeekFilter]        = useState('all');
-  const [view,              setView]              = useState('dashboard'); // 'dashboard' | 'todos'
+  const [showWizard, setShowWizard] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null); // course object or null
+  const [weekFilter, setWeekFilter] = useState('all');
+  const [view, setView] = useState('dashboard'); // 'dashboard' | 'todos'
 
   // ── Auth bootstrap ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -110,34 +110,34 @@ export default function App() {
       const sessions = (sRows ?? [])
         .filter((s) => s.course_id === c.id)
         .map((s) => ({
-          id:       s.id,
+          id: s.id,
           courseId: s.course_id,
-          week:     s.week,
-          type:     s.type,
-          number:   s.number,
-          watched:  s.watched,
+          week: s.week,
+          type: s.type,
+          number: s.number,
+          watched: s.watched,
         }));
       return {
-        id:               c.id,
-        name:             c.name,
-        totalWeeks:       c.total_weeks,
-        weeklyLectures:   c.weekly_lectures,
-        weeklyTutorials:  c.weekly_tutorials,
-        createdAt:        c.created_at,
+        id: c.id,
+        name: c.name,
+        totalWeeks: c.total_weeks,
+        weeklyLectures: c.weekly_lectures,
+        weeklyTutorials: c.weekly_tutorials,
+        createdAt: c.created_at,
         sessions,
-        total:   sessions.length,
+        total: sessions.length,
         watched: sessions.filter((s) => s.watched).length,
       };
     });
     setCourses(assembled);
 
     setTodos((tRows ?? []).map((t) => ({
-      id:             t.id,
-      description:    t.description,
+      id: t.id,
+      description: t.description,
       linkedCourseId: t.linked_course_id,  // UUID string or null
-      linkedWeek:     t.linked_week,
-      done:           t.done,
-      createdAt:      t.created_at,
+      linkedWeek: t.linked_week,
+      done: t.done,
+      createdAt: t.created_at,
     })));
   }
 
@@ -170,7 +170,7 @@ export default function App() {
   // ── Course handlers ────────────────────────────────────────────────────────
 
   const handleCreateCourse = async (formData) => {
-    const userId   = session.user.id;
+    const userId = session.user.id;
     const courseId = crypto.randomUUID();
     const sessions = generateSessions(
       courseId,
@@ -180,14 +180,14 @@ export default function App() {
     );
 
     const newCourse = {
-      id:              courseId,
-      name:            formData.name,
-      totalWeeks:      formData.totalWeeks,
-      weeklyLectures:  formData.weeklyLectures,
+      id: courseId,
+      name: formData.name,
+      totalWeeks: formData.totalWeeks,
+      weeklyLectures: formData.weeklyLectures,
       weeklyTutorials: formData.weeklyTutorials,
-      createdAt:       new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       sessions,
-      total:   sessions.length,
+      total: sessions.length,
       watched: 0,
     };
 
@@ -197,13 +197,13 @@ export default function App() {
 
     // Insert course row (with explicit id so FK from sessions works immediately)
     const { error: cErr } = await supabase.from('courses').insert({
-      id:               courseId,
-      user_id:          userId,
-      name:             formData.name,
-      total_weeks:      formData.totalWeeks,
-      weekly_lectures:  formData.weeklyLectures,
+      id: courseId,
+      user_id: userId,
+      name: formData.name,
+      total_weeks: formData.totalWeeks,
+      weekly_lectures: formData.weeklyLectures,
       weekly_tutorials: formData.weeklyTutorials,
-      created_at:       newCourse.createdAt,
+      created_at: newCourse.createdAt,
     });
 
     if (cErr) {
@@ -215,13 +215,13 @@ export default function App() {
 
     // Bulk-insert all sessions
     const sessionRows = sessions.map((s) => ({
-      id:        s.id,
-      user_id:   userId,
+      id: s.id,
+      user_id: userId,
       course_id: courseId,
-      week:      s.week,
-      type:      s.type,
-      number:    s.number,
-      watched:   false,
+      week: s.week,
+      type: s.type,
+      number: s.number,
+      watched: false,
     }));
 
     const { error: sErr } = await supabase.from('sessions').insert(sessionRows);
@@ -347,6 +347,55 @@ export default function App() {
 
   // ── Session handlers ───────────────────────────────────────────────────────
 
+  const handleAddExtraSession = async (courseId, week, type) => {
+    const course = courses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    // Find the max number for this type across all sessions in the course
+    const typeSessions = course.sessions.filter((s) => s.type === type);
+    const maxNum = typeSessions.reduce((max, s) => Math.max(max, s.number), 0);
+    const nextNum = maxNum + 1;
+
+    const newSession = {
+      id: crypto.randomUUID(),
+      courseId,
+      week: Number(week),
+      type,
+      number: nextNum,
+      watched: false,
+    };
+
+    // Optimistic update
+    setCourses((prev) =>
+      prev.map((c) => {
+        if (c.id !== courseId) return c;
+        const sessions = [...c.sessions, newSession];
+        // Sort sessions by type, then number to keep UI deterministic? 
+        // We'll let the UI handle grouping, but it's fine.
+        return {
+          ...c,
+          sessions,
+          total: sessions.length,
+        };
+      })
+    );
+
+    const { error } = await supabase.from('sessions').insert({
+      id: newSession.id,
+      user_id: session.user.id,
+      course_id: courseId,
+      week: newSession.week,
+      type: newSession.type,
+      number: newSession.number,
+      watched: false,
+    });
+
+    if (error) {
+      console.error('Failed to add extra session:', error);
+      loadData(); // revert
+    }
+  };
+
   const handleSessionToggle = async (sessionId, watched) => {
     // Optimistic update
     setCourses((prev) =>
@@ -390,7 +439,7 @@ export default function App() {
         return {
           ...c,
           sessions,
-          total:   sessions.length,
+          total: sessions.length,
           watched: sessions.filter((s) => s.watched).length,
         };
       })
@@ -407,8 +456,8 @@ export default function App() {
 
   const handleAddTodo = async ({ description, linkedCourseId, linkedWeek }) => {
     // linkedCourseId arrives as a UUID string (or null/empty string)
-    const courseId  = linkedCourseId || null;
-    const id        = crypto.randomUUID();
+    const courseId = linkedCourseId || null;
+    const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
 
     // Optimistic update
@@ -419,12 +468,12 @@ export default function App() {
 
     const { error } = await supabase.from('todos').insert({
       id,
-      user_id:          session.user.id,
+      user_id: session.user.id,
       description,
       linked_course_id: courseId,
-      linked_week:      linkedWeek ?? null,
-      done:             false,
-      created_at:       createdAt,
+      linked_week: linkedWeek ?? null,
+      done: false,
+      created_at: createdAt,
     });
 
     if (error) {
@@ -472,8 +521,8 @@ export default function App() {
   const navTab = selectedCourse
     ? 'course'
     : view === 'todos'
-    ? 'todos'
-    : 'home';
+      ? 'todos'
+      : 'home';
 
   // ── Render guards ──────────────────────────────────────────────────────────
 
@@ -514,8 +563,8 @@ export default function App() {
                 {selectedCourse
                   ? selectedCourse.name
                   : view === 'todos'
-                  ? 'משימות'
-                  : 'מעקב הרצאות ותרגולים'}
+                    ? 'משימות'
+                    : 'מעקב הרצאות ותרגולים'}
               </h1>
               {selectedCourse && (
                 <p className="text-xs text-slate-400">חזרה ללוח הבקרה</p>
@@ -558,7 +607,6 @@ export default function App() {
             course={selectedCourse}
             onSessionToggle={handleSessionToggle}
             onSessionDelete={handleDeleteSession}
-            onEditCourse={(c) => setEditingCourse(c)}
           />
         ) : view === 'todos' ? (
           <TodosPage
@@ -617,11 +665,10 @@ function BottomNav({ tab, onHome, onAdd, onTodos }) {
         {/* ראשי */}
         <button
           onClick={onHome}
-          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${
-            tab === 'home' || tab === 'course'
+          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${tab === 'home' || tab === 'course'
               ? 'text-indigo-400'
               : 'text-slate-500 hover:text-slate-300'
-          }`}
+            }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -644,11 +691,10 @@ function BottomNav({ tab, onHome, onAdd, onTodos }) {
         {/* משימות */}
         <button
           onClick={onTodos}
-          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${
-            tab === 'todos'
+          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${tab === 'todos'
               ? 'text-amber-400'
               : 'text-slate-500 hover:text-slate-300'
-          }`}
+            }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
