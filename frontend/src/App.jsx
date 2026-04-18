@@ -509,6 +509,7 @@ export default function App() {
             course={selectedCourse}
             onSessionToggle={handleSessionToggle}
             onSessionDelete={handleDeleteSession}
+            onAddExtraSession={handleAddExtraSession}
           />
         ) : view === 'todos' ? (
           <TodosPage
