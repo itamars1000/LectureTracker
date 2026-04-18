@@ -52,6 +52,7 @@ export default function App() {
   // UI state
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [showWizard,        setShowWizard]        = useState(false);
+  const [editingCourse,     setEditingCourse]     = useState(null); // course object or null
   const [weekFilter,        setWeekFilter]        = useState('all');
   const [view,              setView]              = useState('dashboard'); // 'dashboard' | 'todos'
 
@@ -231,6 +232,103 @@ export default function App() {
       setCourses((prev) => prev.filter((c) => c.id !== courseId));
       setShowWizard(true);
       throw sErr;
+    }
+  };
+
+  const handleEditCourse = async (formData) => {
+    const course = editingCourse;
+    if (!course) return;
+    const userId = session.user.id;
+
+    const nameChanged = formData.name !== course.name;
+    const structureChanged =
+      formData.totalWeeks !== course.totalWeeks ||
+      formData.weeklyLectures !== course.weeklyLectures ||
+      formData.weeklyTutorials !== course.weeklyTutorials;
+
+    if (structureChanged) {
+      // Regenerate sessions — delete old, insert new
+      const newSessions = generateSessions(
+        course.id,
+        formData.totalWeeks,
+        formData.weeklyLectures,
+        formData.weeklyTutorials,
+      );
+
+      const updatedCourse = {
+        ...course,
+        name: formData.name,
+        totalWeeks: formData.totalWeeks,
+        weeklyLectures: formData.weeklyLectures,
+        weeklyTutorials: formData.weeklyTutorials,
+        sessions: newSessions,
+        total: newSessions.length,
+        watched: 0,
+      };
+
+      // Optimistic update
+      setCourses((prev) => prev.map((c) => (c.id === course.id ? updatedCourse : c)));
+      setEditingCourse(null);
+
+      // Update course row
+      const { error: cErr } = await supabase.from('courses').update({
+        name: formData.name,
+        total_weeks: formData.totalWeeks,
+        weekly_lectures: formData.weeklyLectures,
+        weekly_tutorials: formData.weeklyTutorials,
+      }).eq('id', course.id);
+
+      if (cErr) {
+        console.error('Failed to update course:', cErr);
+        loadData();
+        throw cErr;
+      }
+
+      // Delete old sessions
+      const { error: dErr } = await supabase.from('sessions').delete().eq('course_id', course.id);
+      if (dErr) {
+        console.error('Failed to delete old sessions:', dErr);
+        loadData();
+        throw dErr;
+      }
+
+      // Insert new sessions
+      const sessionRows = newSessions.map((s) => ({
+        id: s.id,
+        user_id: userId,
+        course_id: course.id,
+        week: s.week,
+        type: s.type,
+        number: s.number,
+        watched: false,
+      }));
+
+      const { error: sErr } = await supabase.from('sessions').insert(sessionRows);
+      if (sErr) {
+        console.error('Failed to insert new sessions:', sErr);
+        loadData();
+        throw sErr;
+      }
+    } else if (nameChanged) {
+      // Only name changed — simple update
+      setCourses((prev) =>
+        prev.map((c) => (c.id === course.id ? { ...c, name: formData.name } : c))
+      );
+      setEditingCourse(null);
+
+      const { error } = await supabase
+        .from('courses')
+        .update({ name: formData.name })
+        .eq('id', course.id);
+
+      if (error) {
+        console.error('Failed to update course name:', error);
+        loadData();
+        throw error;
+      }
+    } else {
+      // Nothing changed
+      setEditingCourse(null);
     }
   };
 
@@ -460,6 +558,7 @@ export default function App() {
             course={selectedCourse}
             onSessionToggle={handleSessionToggle}
             onSessionDelete={handleDeleteSession}
+            onEditCourse={(c) => setEditingCourse(c)}
           />
         ) : view === 'todos' ? (
           <TodosPage
@@ -476,6 +575,7 @@ export default function App() {
             onWeekFilterChange={setWeekFilter}
             onSelectCourse={(course) => { setSelectedCourseId(course.id); setView('dashboard'); }}
             onDeleteCourse={handleDeleteCourse}
+            onEditCourse={(c) => setEditingCourse(c)}
             onAddCourse={() => setShowWizard(true)}
             onSessionToggle={handleSessionToggle}
             onSessionDelete={handleDeleteSession}
@@ -496,10 +596,11 @@ export default function App() {
       />
 
       {/* Wizard Modal */}
-      {showWizard && (
+      {(showWizard || editingCourse) && (
         <CourseWizard
-          onSubmit={handleCreateCourse}
-          onClose={() => setShowWizard(false)}
+          editCourse={editingCourse}
+          onSubmit={editingCourse ? handleEditCourse : handleCreateCourse}
+          onClose={() => { setShowWizard(false); setEditingCourse(null); }}
         />
       )}
     </div>

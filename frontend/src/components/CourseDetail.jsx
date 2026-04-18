@@ -6,7 +6,7 @@ const TYPE_COLORS = {
   tutorial: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
 };
 
-export default function CourseDetail({ course, onSessionToggle, onSessionDelete }) {
+export default function CourseDetail({ course, onSessionToggle, onSessionDelete, onEditCourse }) {
   // 'all' | 'lecture' | 'tutorial'
   const [typeFilter, setTypeFilter] = useState('all');
   // 'all' | 'remaining' | 1..N (number)
@@ -76,15 +76,25 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete 
     <div className="space-y-5">
       {/* Course progress card */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-4 relative">
           <div>
             <div className="text-sm text-slate-400 mb-1">התקדמות בקורס</div>
             <div className="text-3xl font-bold text-white">{pct}%</div>
           </div>
-          <div className="text-left">
+          <div className="text-left relative z-10 pl-8">
             <div className="text-sm text-emerald-400 font-semibold">{watched} הושלמו</div>
             <div className="text-sm text-slate-400">{total - watched} נותרו</div>
           </div>
+          {/* Edit Button */}
+          <button
+            onClick={() => onEditCourse && onEditCourse(course)}
+            title="ערוך קורס"
+            className="absolute top-0 left-0 p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-lg transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
         </div>
         <div className="progress-bar h-3">
           <div

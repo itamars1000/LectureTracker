@@ -1,14 +1,22 @@
 import { useState } from 'react';
 
-export default function CourseWizard({ onSubmit, onClose }) {
+export default function CourseWizard({ onSubmit, onClose, editCourse }) {
+  const isEdit = !!editCourse;
   const [form, setForm] = useState({
-    name: '',
-    totalWeeks: 13,
-    weeklyLectures: 2,
-    weeklyTutorials: 1,
+    name: editCourse?.name ?? '',
+    totalWeeks: editCourse?.totalWeeks ?? 13,
+    weeklyLectures: editCourse?.weeklyLectures ?? 2,
+    weeklyTutorials: editCourse?.weeklyTutorials ?? 1,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Detect structural changes that will regenerate sessions
+  const structureChanged = isEdit && (
+    form.totalWeeks !== editCourse.totalWeeks ||
+    form.weeklyLectures !== editCourse.weeklyLectures ||
+    form.weeklyTutorials !== editCourse.weeklyTutorials
+  );
 
   const totalSessions =
     form.totalWeeks * (Number(form.weeklyLectures) + Number(form.weeklyTutorials));
@@ -40,8 +48,8 @@ export default function CourseWizard({ onSubmit, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-700">
           <div>
-            <h2 className="text-lg font-bold text-white">הוספת קורס חדש</h2>
-            <p className="text-sm text-slate-400 mt-0.5">מלא את הפרטים לייצור לוח זמנים אוטומטי</p>
+            <h2 className="text-lg font-bold text-white">{isEdit ? 'עריכת קורס' : 'הוספת קורס חדש'}</h2>
+            <p className="text-sm text-slate-400 mt-0.5">{isEdit ? 'עדכן את פרטי הקורס' : 'מלא את הפרטים לייצור לוח זמנים אוטומטי'}</p>
           </div>
           <button
             onClick={onClose}
@@ -133,6 +141,13 @@ export default function CourseWizard({ onSubmit, onClose }) {
             </div>
           </div>
 
+          {structureChanged && (
+            <div className="text-sm text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2 flex items-start gap-2">
+              <span className="flex-shrink-0 mt-0.5">⚠️</span>
+              <span>שינוי מבנה הקורס (שבועות/הרצאות/תרגולים) יאפס את כל ההתקדמות.</span>
+            </div>
+          )}
+
           {error && (
             <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
               {error}
@@ -156,7 +171,7 @@ export default function CourseWizard({ onSubmit, onClose }) {
               {loading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                'צור קורס'
+                isEdit ? 'שמור שינויים' : 'צור קורס'
               )}
             </button>
           </div>
