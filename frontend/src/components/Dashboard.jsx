@@ -14,6 +14,7 @@ export default function Dashboard({
   onWeekFilterChange,
   onSelectCourse,
   onDeleteCourse,
+  onEditCourse,
   onAddCourse,
   onSessionToggle,
   onSessionDelete,
@@ -164,6 +165,7 @@ export default function Dashboard({
                 course={course}
                 onClick={() => onSelectCourse(course)}
                 onDelete={() => onDeleteCourse(course.id)}
+                onEdit={() => onEditCourse(course)}
               />
             ))}
           </div>
