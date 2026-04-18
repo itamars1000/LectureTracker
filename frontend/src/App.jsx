@@ -253,36 +253,64 @@ export default function App() {
     const course = courses.find((c) => c.id === courseId);
     if (!course) return;
 
-    // Find the max number for this type across all sessions in the course
-    const typeSessions = course.sessions.filter((s) => s.type === type);
-    const maxNum = typeSessions.reduce((max, s) => Math.max(max, s.number), 0);
-    const nextNum = maxNum + 1;
-
     const newSession = {
       id: crypto.randomUUID(),
       courseId,
       week: Number(week),
       type,
-      number: nextNum,
       watched: false,
+      number: 0, // placeholder
     };
+
+    // Deep copy references simply for sorting
+    const typeSessions = course.sessions.filter((s) => s.type === type).map((s) => ({ ...s }));
+    typeSessions.push(newSession);
+
+    // Sort to determine new sequence
+    typeSessions.sort((a, b) => {
+      // 1. Sort by week
+      if (a.week !== b.week) return a.week - b.week;
+      // 2. Within same week, new session goes to the end
+      const aNum = a.id === newSession.id ? Infinity : a.number;
+      const bNum = b.id === newSession.id ? Infinity : b.number;
+      return aNum - bNum;
+    });
+
+    const sessionsToUpdateInDb = [];
+
+    // Assign sequential numbers
+    typeSessions.forEach((s, idx) => {
+      const newNum = idx + 1;
+      if (s.id === newSession.id) {
+        newSession.number = newNum;
+      } else if (s.number !== newNum) {
+        sessionsToUpdateInDb.push({ id: s.id, number: newNum });
+      }
+    });
 
     // Optimistic update
     setCourses((prev) =>
       prev.map((c) => {
         if (c.id !== courseId) return c;
-        const sessions = [...c.sessions, newSession];
-        // Sort sessions by type, then number to keep UI deterministic? 
-        // We'll let the UI handle grouping, but it's fine.
+        
+        // Build updated sessions array with incremented numbers
+        const updatedSessions = c.sessions.map((oldS) => {
+          const changed = sessionsToUpdateInDb.find((u) => u.id === oldS.id);
+          if (changed) return { ...oldS, number: changed.number };
+          return oldS;
+        });
+        updatedSessions.push(newSession);
+
         return {
           ...c,
-          sessions,
-          total: sessions.length,
+          sessions: updatedSessions,
+          total: updatedSessions.length,
         };
       })
     );
 
-    const { error } = await supabase.from('sessions').insert({
+    // 1. Insert new session to DB
+    const { error: insErr } = await supabase.from('sessions').insert({
       id: newSession.id,
       user_id: session.user.id,
       course_id: courseId,
@@ -292,9 +320,18 @@ export default function App() {
       watched: false,
     });
 
-    if (error) {
-      console.error('Failed to add extra session:', error);
+    if (insErr) {
+      console.error('Failed to add extra session:', insErr);
       loadData(); // revert
+      return;
+    }
+
+    // 2. Multi-update the shifted sessions in DB
+    if (sessionsToUpdateInDb.length > 0) {
+      const updatePromises = sessionsToUpdateInDb.map((u) =>
+        supabase.from('sessions').update({ number: u.number }).eq('id', u.id)
+      );
+      await Promise.all(updatePromises);
     }
   };
 
