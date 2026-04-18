@@ -17,10 +17,14 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete 
   const watched = sessions.filter((s) => s.watched).length;
   const pct = total > 0 ? Math.round((watched / total) * 100) : 0;
 
-  // All week numbers 1..totalWeeks — fixed range so deleted-all weeks still appear
+  // All week numbers up to totalWeeks OR highest actual week present
   const allWeeks = useMemo(() => {
-    return Array.from({ length: course.totalWeeks }, (_, i) => i + 1);
-  }, [course.totalWeeks]);
+    let maxWeek = course.totalWeeks || 0;
+    (course.sessions || []).forEach(s => {
+      if (s.week > maxWeek) maxWeek = s.week;
+    });
+    return Array.from({ length: maxWeek }, (_, i) => i + 1);
+  }, [course.totalWeeks, course.sessions]);
 
   // Weeks where every session in this course is watched
   const completedWeeks = useMemo(() => {
@@ -76,25 +80,15 @@ export default function CourseDetail({ course, onSessionToggle, onSessionDelete 
     <div className="space-y-5">
       {/* Course progress card */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg">
-        <div className="flex items-start justify-between mb-4 relative">
+        <div className="flex items-start justify-between mb-4">
           <div>
             <div className="text-sm text-slate-400 mb-1">התקדמות בקורס</div>
             <div className="text-3xl font-bold text-white">{pct}%</div>
           </div>
-          <div className="text-left relative z-10 pl-8">
+          <div className="text-left">
             <div className="text-sm text-emerald-400 font-semibold">{watched} הושלמו</div>
             <div className="text-sm text-slate-400">{total - watched} נותרו</div>
           </div>
-          {/* Edit Button */}
-          <button
-            onClick={() => onEditCourse && onEditCourse(course)}
-            title="ערוך קורס"
-            className="absolute top-0 left-0 p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-lg transition-all"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
         </div>
         <div className="progress-bar h-3">
           <div
