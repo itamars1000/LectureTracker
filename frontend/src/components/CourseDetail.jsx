@@ -6,7 +6,22 @@ const TYPE_COLORS = {
   tutorial: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
 };
 
-export default function CourseDetail({ course, onSessionToggle, onSessionDelete }) {
+export default function CourseDetail({ course, onSessionToggle, onSessionDelete, onAddExtraSession }) {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalWeek, setAddModalWeek] = useState(null);
+
+  const handleOpenAddModal = (week = null) => {
+    setAddModalWeek(week);
+    setShowAddModal(true);
+  };
+
+  const handleAddSubmit = (week, type) => {
+    if (onAddExtraSession) {
+      onAddExtraSession(course.id, week, type);
+    }
+    setShowAddModal(false);
+  };
+
   // 'all' | 'lecture' | 'tutorial'
   const [typeFilter, setTypeFilter] = useState('all');
   // 'all' | 'remaining' | 1..N (number)
