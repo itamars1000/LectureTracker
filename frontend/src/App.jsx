@@ -19,13 +19,26 @@ export default function App() {
   const userId = session?.user?.id ?? null;
 
   // ── Domain state (auto-load/clear when userId changes) ──────────────────────
-  const { courses, createCourse, deleteCourse, toggleSession, deleteSession, addExtraSession } =
-    useCourses(userId);
-  const { todos, addTodo, toggleTodo, deleteTodo } = useTodos(userId);
+  const {
+    courses,
+    isLoading: isCoursesLoading,
+    createCourse,
+    updateCourse,
+    deleteCourse,
+    toggleSession,
+    deleteSession,
+    addExtraSession,
+  } = useCourses(userId);
+
+  const { todos, isLoading: isTodosLoading, addTodo, toggleTodo, deleteTodo } =
+    useTodos(userId);
+
+  const isLoading = isCoursesLoading || isTodosLoading;
 
   // ── UI / Navigation state ───────────────────────────────────────────────────
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null); // course object being edited, or null
   const [weekFilter, setWeekFilter] = useState('all');
   const [view, setView] = useState('dashboard'); // 'dashboard' | 'todos'
 
@@ -42,11 +55,17 @@ export default function App() {
     setView('todos');
   };
 
-  // ── Course handlers (thin wrappers that add UI side-effects) ────────────────
+  // ── Course handlers ─────────────────────────────────────────────────────────
 
   const handleCreateCourse = async (formData) => {
     await createCourse(formData); // throws on DB error (CourseWizard catches it)
     setShowWizard(false);
+  };
+
+  const handleEditCourse = async (formData) => {
+    if (!editingCourse) return;
+    await updateCourse(editingCourse.id, formData); // throws on DB error
+    setEditingCourse(null);
   };
 
   const handleDeleteCourse = (id) => {
@@ -161,7 +180,9 @@ export default function App() {
 
       {/* Main */}
       <main className="max-w-6xl mx-auto px-4 py-6 pb-24">
-        {selectedCourse ? (
+        {isLoading ? (
+          <DashboardSkeleton />
+        ) : selectedCourse ? (
           <CourseDetail
             course={selectedCourse}
             onSessionToggle={toggleSession}
@@ -183,6 +204,7 @@ export default function App() {
             onWeekFilterChange={setWeekFilter}
             onSelectCourse={(course) => { setSelectedCourseId(course.id); setView('dashboard'); }}
             onDeleteCourse={handleDeleteCourse}
+            onEditCourse={(course) => setEditingCourse(course)}
             onAddCourse={() => setShowWizard(true)}
             onSessionToggle={toggleSession}
             onSessionDelete={deleteSession}
@@ -202,12 +224,45 @@ export default function App() {
         onTodos={handleNavTodos}
       />
 
+      {/* Create wizard */}
       {showWizard && (
         <CourseWizard
           onSubmit={handleCreateCourse}
           onClose={() => setShowWizard(false)}
         />
       )}
+
+      {/* Edit wizard */}
+      {editingCourse && (
+        <CourseWizard
+          editCourse={editingCourse}
+          onSubmit={handleEditCourse}
+          onClose={() => setEditingCourse(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Dashboard loading skeleton ───────────────────────────────────────────────
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse">
+      {/* Stats card placeholder */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 h-44" />
+      {/* Week picker placeholder */}
+      <div className="flex gap-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-8 w-20 rounded-full bg-gray-200 dark:bg-slate-700 flex-shrink-0" />
+        ))}
+      </div>
+      {/* Course cards grid placeholder */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 h-52" />
+        ))}
+      </div>
     </div>
   );
 }

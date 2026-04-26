@@ -10,14 +10,18 @@ import { supabase } from '../lib/supabase.js';
  * Auto-clears when userId becomes falsy (logout).
  *
  * All mutations follow optimistic update → DB write → revert on error.
+ *
+ * Returns isLoading: true until the first successful fetch completes.
  */
 export function useTodos(userId) {
   const [todos, setTodos] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
   const loadTodos = useCallback(async () => {
     if (!userId) return;
+    setIsLoading(true);
     const { data, error } = await supabase
       .from('todos')
       .select('*')
@@ -26,6 +30,7 @@ export function useTodos(userId) {
 
     if (error) {
       console.error('loadTodos error:', error);
+      setIsLoading(false);
       return;
     }
 
@@ -39,11 +44,16 @@ export function useTodos(userId) {
         createdAt: t.created_at,
       })),
     );
+    setIsLoading(false);
   }, [userId]);
 
   useEffect(() => {
-    if (userId) loadTodos();
-    else setTodos([]);
+    if (userId) {
+      loadTodos();
+    } else {
+      setTodos([]);
+      setIsLoading(false);
+    }
   }, [userId, loadTodos]);
 
   // ── Add ─────────────────────────────────────────────────────────────────────
@@ -107,5 +117,5 @@ export function useTodos(userId) {
 
   // ── Return ──────────────────────────────────────────────────────────────────
 
-  return { todos, addTodo, toggleTodo, deleteTodo };
+  return { todos, isLoading, addTodo, toggleTodo, deleteTodo };
 }

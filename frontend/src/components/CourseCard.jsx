@@ -44,11 +44,16 @@ function ProgressRing({ pct, colorHex }) {
 
 // ── Course Card ──────────────────────────────────────────────────────────────
 
-export default function CourseCard({ course, onClick, onDelete }) {
+export default function CourseCard({ course, onClick, onDelete, onEdit }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const pct = course.total > 0 ? Math.round((course.watched / course.total) * 100) : 0;
   const isDone = pct === 100;
   const color = getCourseColor(course.id);
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    onEdit?.();
+  };
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -72,7 +77,7 @@ export default function CourseCard({ course, onClick, onDelete }) {
         group relative shadow-sm
       `}
     >
-      {/* Delete button */}
+      {/* Delete button — top left, appears on hover (or when confirming) */}
       <button
         onClick={handleDelete}
         className={`absolute top-3 left-3 p-1.5 rounded-lg text-xs transition-all ${
@@ -92,14 +97,26 @@ export default function CourseCard({ course, onClick, onDelete }) {
         )}
       </button>
 
-      {/* Completed badge */}
+      {/* Edit button — top right, appears on hover (replaces the badge visually) */}
+      <button
+        onClick={handleEdit}
+        className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all opacity-0 group-hover:opacity-100"
+        title="ערוך קורס"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      </button>
+
+      {/* Completed badge — top right, hidden on hover (edit button takes over) */}
       {isDone && (
-        <span className="absolute top-3 right-3 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
+        <span className="absolute top-3 right-3 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium group-hover:opacity-0 transition-opacity">
           הושלם ✓
         </span>
       )}
 
-      {/* Course name */}
+      {/* Course name — pl-6 clears the delete button */}
       <h3 className={`text-base font-semibold mb-1 transition-colors line-clamp-2 pl-6
         text-gray-900 dark:text-white ${color.hoverText}`}
       >

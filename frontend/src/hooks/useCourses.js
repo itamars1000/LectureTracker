@@ -72,14 +72,19 @@ function assembleCourse(c, sRows) {
  * Auto-clears when userId becomes falsy (logout).
  *
  * All mutations follow optimistic update → DB write → revert on error.
+ *
+ * Returns isLoading: true from the moment userId is set until the first
+ * successful fetch completes, so callers can show a skeleton.
  */
 export function useCourses(userId) {
   const [courses, setCourses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
   const loadCourses = useCallback(async () => {
     if (!userId) return;
+    setIsLoading(true);
     const [
       { data: cRows, error: cErr },
       { data: sRows, error: sErr },
@@ -94,15 +99,21 @@ export function useCourses(userId) {
 
     if (cErr || sErr) {
       console.error('loadCourses error:', cErr ?? sErr);
+      setIsLoading(false);
       return;
     }
 
     setCourses((cRows ?? []).map((c) => assembleCourse(c, sRows ?? [])));
+    setIsLoading(false);
   }, [userId]);
 
   useEffect(() => {
-    if (userId) loadCourses();
-    else setCourses([]);
+    if (userId) {
+      loadCourses();
+    } else {
+      setCourses([]);
+      setIsLoading(false);
+    }
   }, [userId, loadCourses]);
 
   // ── Create ──────────────────────────────────────────────────────────────────
@@ -170,6 +181,105 @@ export function useCourses(userId) {
     }
   };
 
+  // ── Update (edit) ───────────────────────────────────────────────────────────
+
+  /**
+   * Updates an existing course.
+   * - Name-only change: updates the name in-place, no progress reset.
+   * - Structure change (weeks / lectures / tutorials): deletes all existing
+   *   sessions and regenerates them from scratch (progress is reset).
+   *   CourseWizard already warns the user about this before they submit.
+   * Throws on DB error so CourseWizard can show an error message.
+   */
+  const updateCourse = async (courseId, formData) => {
+    const course = courses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    const structureChanged =
+      formData.totalWeeks !== course.totalWeeks ||
+      formData.weeklyLectures !== course.weeklyLectures ||
+      formData.weeklyTutorials !== course.weeklyTutorials;
+
+    if (structureChanged) {
+      const newSessions = generateSessions(
+        courseId,
+        formData.totalWeeks,
+        formData.weeklyLectures,
+        formData.weeklyTutorials,
+      );
+
+      // Optimistic
+      setCourses((prev) =>
+        prev.map((c) =>
+          c.id !== courseId
+            ? c
+            : {
+                ...c,
+                name: formData.name,
+                totalWeeks: formData.totalWeeks,
+                weeklyLectures: formData.weeklyLectures,
+                weeklyTutorials: formData.weeklyTutorials,
+                sessions: newSessions,
+                total: newSessions.length,
+                watched: 0,
+              },
+        ),
+      );
+
+      // DB: update course row
+      const { error: updateErr } = await supabase
+        .from('courses')
+        .update({
+          name: formData.name,
+          total_weeks: formData.totalWeeks,
+          weekly_lectures: formData.weeklyLectures,
+          weekly_tutorials: formData.weeklyTutorials,
+        })
+        .eq('id', courseId);
+
+      if (updateErr) {
+        loadCourses();
+        throw updateErr;
+      }
+
+      // DB: replace sessions (ON DELETE CASCADE would handle this too, but
+      // we delete explicitly to avoid relying on DB-side cascade timing)
+      await supabase.from('sessions').delete().eq('course_id', courseId);
+
+      const { error: insErr } = await supabase.from('sessions').insert(
+        newSessions.map((s) => ({
+          id: s.id,
+          user_id: userId,
+          course_id: courseId,
+          week: s.week,
+          type: s.type,
+          number: s.number,
+          watched: false,
+        })),
+      );
+
+      if (insErr) {
+        loadCourses();
+        throw insErr;
+      }
+    } else {
+      // Name-only change
+      setCourses((prev) =>
+        prev.map((c) => (c.id !== courseId ? c : { ...c, name: formData.name })),
+      );
+
+      const { error } = await supabase
+        .from('courses')
+        .update({ name: formData.name })
+        .eq('id', courseId);
+
+      if (error) {
+        loadCourses();
+        throw error;
+      }
+    }
+  };
+
   // ── Delete course ───────────────────────────────────────────────────────────
 
   const deleteCourse = async (id) => {
@@ -202,7 +312,6 @@ export function useCourses(userId) {
 
     if (error) {
       console.error('toggleSession error:', error);
-      // Revert
       setCourses((prev) =>
         prev.map((c) => {
           const idx = c.sessions.findIndex((s) => s.id === sessionId);
@@ -257,14 +366,12 @@ export function useCourses(userId) {
       number: 0,
     };
 
-    // Build new ordering for this type
     const typeSessions = course.sessions
       .filter((s) => s.type === type)
       .map((s) => ({ ...s }));
     typeSessions.push(newSession);
     typeSessions.sort((a, b) => {
       if (a.week !== b.week) return a.week - b.week;
-      // New session goes last within its week
       const aNum = a.id === newSession.id ? Infinity : a.number;
       const bNum = b.id === newSession.id ? Infinity : b.number;
       return aNum - bNum;
@@ -322,7 +429,9 @@ export function useCourses(userId) {
 
   return {
     courses,
+    isLoading,
     createCourse,
+    updateCourse,
     deleteCourse,
     toggleSession,
     deleteSession,
