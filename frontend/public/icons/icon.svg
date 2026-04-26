@@ -1,15 +1,12 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="256" cy="256" r="256" fill="url(#paint0_linear)"/>
-    
-    <path d="M120 160V352C120 374.091 137.909 392 160 392H352C374.091 392 392 374.091 392 352" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M190 280L240 330L392 120" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M120 220H190" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M120 280H150" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-
-    <defs>
-        <linearGradient id="paint0_linear" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#3ECF8E"/> 
-            <stop offset="1" stop-color="#34B27B"/>
-        </linearGradient>
-    </defs>
+  <circle cx="256" cy="256" r="256" fill="url(#grad)"/>
+  <path d="M380 256C380 324.483 324.483 380 256 380C187.517 380 132 324.483 132 256C132 187.517 187.517 132 256 132" stroke="white" stroke-width="45" stroke-linecap="round"/>
+  <path d="M256 132L320 80M256 132L320 184" stroke="white" stroke-width="45" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="40" fill="white"/>
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#4338CA"/>
+    </linearGradient>
+  </defs>
 </svg>
