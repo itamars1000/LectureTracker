@@ -1,446 +1,68 @@
-import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase.js';
+import { useState } from 'react';
+import { useTheme } from './hooks/useTheme.js';
+import { useAuth } from './hooks/useAuth.js';
+import { useCourses } from './hooks/useCourses.js';
+import { useTodos } from './hooks/useTodos.js';
 import Dashboard from './components/Dashboard.jsx';
 import CourseDetail from './components/CourseDetail.jsx';
 import CourseWizard from './components/CourseWizard.jsx';
 import TodosPage from './components/TodosPage.jsx';
 import LoginPage from './components/LoginPage.jsx';
 
-// ── Session generation helper ────────────────────────────────────────────────
-
-function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials) {
-  const sessions = [];
-  let lectureNum = 1;
-  let tutorialNum = 1;
-  for (let week = 1; week <= totalWeeks; week++) {
-    for (let i = 0; i < weeklyLectures; i++) {
-      sessions.push({
-        id: crypto.randomUUID(),
-        courseId,
-        week,
-        type: 'lecture',
-        number: lectureNum++,
-        watched: false,
-      });
-    }
-    for (let i = 0; i < weeklyTutorials; i++) {
-      sessions.push({
-        id: crypto.randomUUID(),
-        courseId,
-        week,
-        type: 'tutorial',
-        number: tutorialNum++,
-        watched: false,
-      });
-    }
-  }
-  return sessions;
-}
-
 // ── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  // ── Theme ──────────────────────────────────────────────────────────────────
-  const [isDark, setIsDark] = useState(() => {
-    try {
-      const saved = localStorage.getItem('lecture-tracker-theme');
-      return saved !== null ? saved === 'dark' : true; // default dark
-    } catch {
-      return true;
-    }
-  });
+  // ── Cross-cutting concerns ──────────────────────────────────────────────────
+  const { isDark, setIsDark } = useTheme();
+  const { session, signIn, signOut, loading: authLoading, error: authError } = useAuth();
 
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    try { localStorage.setItem('lecture-tracker-theme', isDark ? 'dark' : 'light'); } catch {}
-  }, [isDark]);
+  const userId = session?.user?.id ?? null;
 
-  // ── Auth state: undefined = still checking, null = logged out, object = logged in
-  const [session, setSession] = useState(undefined);
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+  // ── Domain state (auto-load/clear when userId changes) ──────────────────────
+  const { courses, createCourse, deleteCourse, toggleSession, deleteSession, addExtraSession } =
+    useCourses(userId);
+  const { todos, addTodo, toggleTodo, deleteTodo } = useTodos(userId);
 
-  // Data state — populated from Supabase after session is confirmed
-  const [courses, setCourses] = useState([]);
-  const [todos, setTodos] = useState([]);
-
-  // UI state
+  // ── UI / Navigation state ───────────────────────────────────────────────────
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
   const [weekFilter, setWeekFilter] = useState('all');
   const [view, setView] = useState('dashboard'); // 'dashboard' | 'todos'
 
-  // ── Auth bootstrap ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) {
-        setCourses([]);
-        setTodos([]);
-        setSelectedCourseId(null);
-        setView('dashboard');
-        setWeekFilter('all');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // ── Load all data once session is available ────────────────────────────────
-  useEffect(() => {
-    if (session) loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
-
-  async function loadData() {
-    const uid = session.user.id;
-
-    const [
-      { data: cRows, error: cErr },
-      { data: sRows, error: sErr },
-      { data: tRows, error: tErr },
-    ] = await Promise.all([
-      supabase.from('courses').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('sessions').select('*').eq('user_id', uid),
-      supabase.from('todos').select('*').eq('user_id', uid).order('created_at', { ascending: true }),
-    ]);
-
-    if (cErr || sErr || tErr) {
-      console.error('loadData error:', cErr ?? sErr ?? tErr);
-      return;
-    }
-
-    const assembled = (cRows ?? []).map((c) => {
-      const sessions = (sRows ?? [])
-        .filter((s) => s.course_id === c.id)
-        .map((s) => ({
-          id: s.id,
-          courseId: s.course_id,
-          week: s.week,
-          type: s.type,
-          number: s.number,
-          watched: s.watched,
-        }));
-      return {
-        id: c.id,
-        name: c.name,
-        totalWeeks: c.total_weeks,
-        weeklyLectures: c.weekly_lectures,
-        weeklyTutorials: c.weekly_tutorials,
-        createdAt: c.created_at,
-        sessions,
-        total: sessions.length,
-        watched: sessions.filter((s) => s.watched).length,
-      };
-    });
-    setCourses(assembled);
-
-    setTodos((tRows ?? []).map((t) => ({
-      id: t.id,
-      description: t.description,
-      linkedCourseId: t.linked_course_id,
-      linkedWeek: t.linked_week,
-      done: t.done,
-      createdAt: t.created_at,
-    })));
-  }
-
-  // ── Auth handlers ──────────────────────────────────────────────────────────
-
-  const handleSignIn = async () => {
-    setAuthLoading(true);
-    setAuthError('');
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
-    if (error) {
-      setAuthError('שגיאה בהתחברות עם Google. נסה שוב.');
-      setAuthLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  // ── Course handlers ────────────────────────────────────────────────────────
-
-  const handleCreateCourse = async (formData) => {
-    const userId = session.user.id;
-    const courseId = crypto.randomUUID();
-    const sessions = generateSessions(
-      courseId,
-      formData.totalWeeks,
-      formData.weeklyLectures,
-      formData.weeklyTutorials,
-    );
-
-    const newCourse = {
-      id: courseId,
-      name: formData.name,
-      totalWeeks: formData.totalWeeks,
-      weeklyLectures: formData.weeklyLectures,
-      weeklyTutorials: formData.weeklyTutorials,
-      createdAt: new Date().toISOString(),
-      sessions,
-      total: sessions.length,
-      watched: 0,
-    };
-
-    setCourses((prev) => [newCourse, ...prev]);
-    setShowWizard(false);
-
-    const { error: cErr } = await supabase.from('courses').insert({
-      id: courseId,
-      user_id: userId,
-      name: formData.name,
-      total_weeks: formData.totalWeeks,
-      weekly_lectures: formData.weeklyLectures,
-      weekly_tutorials: formData.weeklyTutorials,
-      created_at: newCourse.createdAt,
-    });
-
-    if (cErr) {
-      console.error('Failed to create course:', cErr);
-      setCourses((prev) => prev.filter((c) => c.id !== courseId));
-      setShowWizard(true);
-      throw cErr;
-    }
-
-    const sessionRows = sessions.map((s) => ({
-      id: s.id,
-      user_id: userId,
-      course_id: courseId,
-      week: s.week,
-      type: s.type,
-      number: s.number,
-      watched: false,
-    }));
-
-    const { error: sErr } = await supabase.from('sessions').insert(sessionRows);
-
-    if (sErr) {
-      console.error('Failed to insert sessions:', sErr);
-      await supabase.from('courses').delete().eq('id', courseId);
-      setCourses((prev) => prev.filter((c) => c.id !== courseId));
-      setShowWizard(true);
-      throw sErr;
-    }
-  };
-
-  const handleDeleteCourse = async (id) => {
-    setCourses((prev) => prev.filter((c) => c.id !== id));
-    if (selectedCourseId === id) setSelectedCourseId(null);
-
-    const { error } = await supabase.from('courses').delete().eq('id', id);
-    if (error) {
-      console.error('Failed to delete course:', error);
-      loadData();
-    }
-  };
-
-  // ── Session handlers ───────────────────────────────────────────────────────
-
-  const handleAddExtraSession = async (courseId, week, type) => {
-    const course = courses.find((c) => c.id === courseId);
-    if (!course) return;
-
-    const newSession = {
-      id: crypto.randomUUID(),
-      courseId,
-      week: Number(week),
-      type,
-      watched: false,
-      number: 0,
-    };
-
-    const typeSessions = course.sessions.filter((s) => s.type === type).map((s) => ({ ...s }));
-    typeSessions.push(newSession);
-
-    typeSessions.sort((a, b) => {
-      if (a.week !== b.week) return a.week - b.week;
-      const aNum = a.id === newSession.id ? Infinity : a.number;
-      const bNum = b.id === newSession.id ? Infinity : b.number;
-      return aNum - bNum;
-    });
-
-    const sessionsToUpdateInDb = [];
-
-    typeSessions.forEach((s, idx) => {
-      const newNum = idx + 1;
-      if (s.id === newSession.id) {
-        newSession.number = newNum;
-      } else if (s.number !== newNum) {
-        sessionsToUpdateInDb.push({ id: s.id, number: newNum });
-      }
-    });
-
-    setCourses((prev) =>
-      prev.map((c) => {
-        if (c.id !== courseId) return c;
-        const updatedSessions = c.sessions.map((oldS) => {
-          const changed = sessionsToUpdateInDb.find((u) => u.id === oldS.id);
-          if (changed) return { ...oldS, number: changed.number };
-          return oldS;
-        });
-        updatedSessions.push(newSession);
-        return { ...c, sessions: updatedSessions, total: updatedSessions.length };
-      })
-    );
-
-    const { error: insErr } = await supabase.from('sessions').insert({
-      id: newSession.id,
-      user_id: session.user.id,
-      course_id: courseId,
-      week: newSession.week,
-      type: newSession.type,
-      number: newSession.number,
-      watched: false,
-    });
-
-    if (insErr) {
-      console.error('Failed to add extra session:', insErr);
-      loadData();
-      return;
-    }
-
-    if (sessionsToUpdateInDb.length > 0) {
-      await Promise.all(
-        sessionsToUpdateInDb.map((u) =>
-          supabase.from('sessions').update({ number: u.number }).eq('id', u.id)
-        )
-      );
-    }
-  };
-
-  const handleSessionToggle = async (sessionId, watched) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        const idx = c.sessions.findIndex((s) => s.id === sessionId);
-        if (idx === -1) return c;
-        const sessions = c.sessions.map((s) =>
-          s.id === sessionId ? { ...s, watched } : s
-        );
-        return { ...c, sessions, watched: sessions.filter((s) => s.watched).length };
-      })
-    );
-
-    const { error } = await supabase
-      .from('sessions')
-      .update({ watched })
-      .eq('id', sessionId);
-
-    if (error) {
-      console.error('Failed to toggle session:', error);
-      setCourses((prev) =>
-        prev.map((c) => {
-          const idx = c.sessions.findIndex((s) => s.id === sessionId);
-          if (idx === -1) return c;
-          const sessions = c.sessions.map((s) =>
-            s.id === sessionId ? { ...s, watched: !watched } : s
-          );
-          return { ...c, sessions, watched: sessions.filter((s) => s.watched).length };
-        })
-      );
-    }
-  };
-
-  const handleDeleteSession = async (sessionId) => {
-    setCourses((prev) =>
-      prev.map((c) => {
-        const sessions = c.sessions.filter((s) => s.id !== sessionId);
-        if (sessions.length === c.sessions.length) return c;
-        return { ...c, sessions, total: sessions.length, watched: sessions.filter((s) => s.watched).length };
-      })
-    );
-
-    const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
-    if (error) {
-      console.error('Failed to delete session:', error);
-      loadData();
-    }
-  };
-
-  // ── Todo handlers ──────────────────────────────────────────────────────────
-
-  const handleAddTodo = async ({ description, linkedCourseId, linkedWeek }) => {
-    const courseId = linkedCourseId || null;
-    const id = crypto.randomUUID();
-    const createdAt = new Date().toISOString();
-
-    setTodos((prev) => [
-      ...prev,
-      { id, description, linkedCourseId: courseId, linkedWeek: linkedWeek ?? null, done: false, createdAt },
-    ]);
-
-    const { error } = await supabase.from('todos').insert({
-      id,
-      user_id: session.user.id,
-      description,
-      linked_course_id: courseId,
-      linked_week: linkedWeek ?? null,
-      done: false,
-      created_at: createdAt,
-    });
-
-    if (error) {
-      console.error('Failed to add todo:', error);
-      setTodos((prev) => prev.filter((t) => t.id !== id));
-    }
-  };
-
-  const handleToggleTodo = async (id, done) => {
-    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done } : t)));
-
-    const { error } = await supabase.from('todos').update({ done }).eq('id', id);
-    if (error) {
-      console.error('Failed to toggle todo:', error);
-      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !done } : t)));
-    }
-  };
-
-  const handleDeleteTodo = async (id) => {
-    setTodos((prev) => prev.filter((t) => t.id !== id));
-
-    const { error } = await supabase.from('todos').delete().eq('id', id);
-    if (error) {
-      console.error('Failed to delete todo:', error);
-      loadData();
-    }
-  };
-
-  // ── Navigation handlers ────────────────────────────────────────────────────
+  // ── Navigation handlers ─────────────────────────────────────────────────────
 
   const handleNavHome = () => {
     setSelectedCourseId(null);
     setWeekFilter('all');
     setView('dashboard');
   };
+
   const handleNavTodos = () => {
     setSelectedCourseId(null);
     setView('todos');
   };
 
+  // ── Course handlers (thin wrappers that add UI side-effects) ────────────────
+
+  const handleCreateCourse = async (formData) => {
+    await createCourse(formData); // throws on DB error (CourseWizard catches it)
+    setShowWizard(false);
+  };
+
+  const handleDeleteCourse = (id) => {
+    if (selectedCourseId === id) setSelectedCourseId(null);
+    deleteCourse(id);
+  };
+
+  // ── Derived UI values ───────────────────────────────────────────────────────
+
   const selectedCourse = selectedCourseId
     ? courses.find((c) => c.id === selectedCourseId) ?? null
     : null;
 
-  const navTab = selectedCourse
-    ? 'course'
-    : view === 'todos'
-      ? 'todos'
-      : 'home';
+  const navTab = selectedCourse ? 'course' : view === 'todos' ? 'todos' : 'home';
 
-  // ── Render guards ──────────────────────────────────────────────────────────
+  // ── Render guards ───────────────────────────────────────────────────────────
 
   if (session === undefined) {
     return (
@@ -451,10 +73,10 @@ export default function App() {
   }
 
   if (!session) {
-    return <LoginPage onSignIn={handleSignIn} loading={authLoading} error={authError} />;
+    return <LoginPage onSignIn={signIn} loading={authLoading} error={authError} />;
   }
 
-  // ── Authenticated app ──────────────────────────────────────────────────────
+  // ── Authenticated app ───────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
@@ -496,13 +118,11 @@ export default function App() {
               className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
             >
               {isDark ? (
-                /* Sun icon */
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               ) : (
-                /* Moon icon */
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
@@ -523,7 +143,7 @@ export default function App() {
                   הוסף קורס
                 </button>
                 <button
-                  onClick={handleSignOut}
+                  onClick={signOut}
                   title={session.user.email}
                   className="flex items-center gap-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-lg text-sm transition-colors"
                 >
@@ -544,17 +164,17 @@ export default function App() {
         {selectedCourse ? (
           <CourseDetail
             course={selectedCourse}
-            onSessionToggle={handleSessionToggle}
-            onSessionDelete={handleDeleteSession}
-            onAddExtraSession={handleAddExtraSession}
+            onSessionToggle={toggleSession}
+            onSessionDelete={deleteSession}
+            onAddExtraSession={addExtraSession}
           />
         ) : view === 'todos' ? (
           <TodosPage
             todos={todos}
             courses={courses}
-            onAddTodo={handleAddTodo}
-            onToggleTodo={handleToggleTodo}
-            onDeleteTodo={handleDeleteTodo}
+            onAddTodo={addTodo}
+            onToggleTodo={toggleTodo}
+            onDeleteTodo={deleteTodo}
           />
         ) : (
           <Dashboard
@@ -564,12 +184,12 @@ export default function App() {
             onSelectCourse={(course) => { setSelectedCourseId(course.id); setView('dashboard'); }}
             onDeleteCourse={handleDeleteCourse}
             onAddCourse={() => setShowWizard(true)}
-            onSessionToggle={handleSessionToggle}
-            onSessionDelete={handleDeleteSession}
+            onSessionToggle={toggleSession}
+            onSessionDelete={deleteSession}
             todos={todos}
-            onAddTodo={handleAddTodo}
-            onToggleTodo={handleToggleTodo}
-            onDeleteTodo={handleDeleteTodo}
+            onAddTodo={addTodo}
+            onToggleTodo={toggleTodo}
+            onDeleteTodo={deleteTodo}
           />
         )}
       </main>
