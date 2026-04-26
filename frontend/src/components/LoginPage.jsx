@@ -22,9 +22,7 @@ export default function LoginPage({ onSignIn, loading, error }) {
         {/* ── Branding ─────────────────────────────────────────────────────── */}
         <div className="text-center flex flex-col items-center gap-5">
           {/* App icon */}
-          <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/25 flex items-center justify-center shadow-sm">
-            <span className="text-4xl select-none">📚</span>
-          </div>
+          <img src="/icons/icon.svg" alt="לוגו האפליקציה" className="w-20 h-20 drop-shadow-lg" />
 
           <div>
             <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
