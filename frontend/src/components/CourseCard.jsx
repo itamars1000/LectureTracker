@@ -1,15 +1,54 @@
 import { useState } from 'react';
+import { getCourseColor } from '../lib/courseColors.js';
+
+// ── SVG Progress Ring ────────────────────────────────────────────────────────
+
+function ProgressRing({ pct, colorHex }) {
+  const r = 30;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  const isDone = pct === 100;
+
+  return (
+    <div className="relative w-[72px] h-[72px] flex items-center justify-center flex-shrink-0">
+      <svg width="72" height="72" viewBox="0 0 72 72" className="-rotate-90">
+        {/* Track */}
+        <circle
+          cx="36" cy="36" r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="7"
+          className="text-gray-200 dark:text-slate-700"
+        />
+        {/* Progress fill */}
+        <circle
+          cx="36" cy="36" r={r}
+          fill="none"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          style={{
+            stroke: isDone ? '#10b981' : colorHex,
+            transition: 'stroke-dashoffset 0.7s ease',
+          }}
+        />
+      </svg>
+      {/* Centre label */}
+      <span className="absolute text-sm font-bold text-gray-900 dark:text-white">
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+// ── Course Card ──────────────────────────────────────────────────────────────
 
 export default function CourseCard({ course, onClick, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const pct = course.total > 0 ? Math.round((course.watched / course.total) * 100) : 0;
-
-  const colorClass =
-    pct === 100
-      ? 'from-emerald-500 to-teal-500'
-      : pct >= 50
-      ? 'from-indigo-500 to-violet-500'
-      : 'from-blue-500 to-indigo-500';
+  const isDone = pct === 100;
+  const color = getCourseColor(course.id);
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -24,7 +63,14 @@ export default function CourseCard({ course, onClick, onDelete }) {
   return (
     <div
       onClick={onClick}
-      className="bg-slate-800 border border-slate-700 rounded-2xl p-5 cursor-pointer hover:border-indigo-500/60 hover:bg-slate-750 transition-all duration-200 group relative shadow-md"
+      className={`
+        bg-white dark:bg-slate-800
+        border border-gray-200 dark:border-slate-700
+        ${color.hoverBorder}
+        rounded-2xl p-5 cursor-pointer
+        hover:shadow-md transition-all duration-200
+        group relative shadow-sm
+      `}
     >
       {/* Delete button */}
       <button
@@ -32,7 +78,7 @@ export default function CourseCard({ course, onClick, onDelete }) {
         className={`absolute top-3 left-3 p-1.5 rounded-lg text-xs transition-all ${
           confirmDelete
             ? 'bg-red-500 text-white'
-            : 'text-slate-500 hover:text-red-400 hover:bg-slate-700 opacity-0 group-hover:opacity-100'
+            : 'text-gray-400 dark:text-slate-500 hover:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100'
         }`}
         title={confirmDelete ? 'לחץ שוב לאישור מחיקה' : 'מחק קורס'}
       >
@@ -40,42 +86,37 @@ export default function CourseCard({ course, onClick, onDelete }) {
           <span className="px-1 font-medium">מחק?</span>
         ) : (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         )}
       </button>
 
-      {/* Badge */}
-      {pct === 100 && (
-        <span className="absolute top-3 right-3 text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
+      {/* Completed badge */}
+      {isDone && (
+        <span className="absolute top-3 right-3 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
           הושלם ✓
         </span>
       )}
 
       {/* Course name */}
-      <h3 className="text-base font-semibold text-white mb-1 group-hover:text-indigo-300 transition-colors line-clamp-2 pl-6">
+      <h3 className={`text-base font-semibold mb-1 transition-colors line-clamp-2 pl-6
+        text-gray-900 dark:text-white ${color.hoverText}`}
+      >
         {course.name}
       </h3>
 
       {/* Meta */}
-      <div className="flex gap-3 text-xs text-slate-400 mb-4">
-        <span>{course.totalWeeks} שבועות</span>
-        <span>·</span>
-        <span>{course.total} שיעורים</span>
-      </div>
+      <p className="text-xs text-gray-400 dark:text-slate-400 mb-5">
+        {course.totalWeeks} שבועות · {course.total} שיעורים
+      </p>
 
-      {/* Progress */}
-      <div className="space-y-2">
-        <div className="flex justify-between text-xs">
-          <span className="text-slate-400">{course.watched} / {course.total} נצפו</span>
-          <span className="font-semibold text-white">{pct}%</span>
-        </div>
-        <div className="progress-bar">
-          <div
-            className={`progress-fill bg-gradient-to-l ${colorClass}`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+      {/* Progress ring — centered */}
+      <div className="flex flex-col items-center gap-2">
+        <ProgressRing pct={pct} colorHex={color.hex} />
+        <p className="text-xs text-gray-400 dark:text-slate-400">
+          {course.watched} / {course.total} נצפו
+        </p>
       </div>
     </div>
   );

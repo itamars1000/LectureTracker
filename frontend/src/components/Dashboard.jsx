@@ -4,8 +4,8 @@ import TodoPanel from './TodoPanel.jsx';
 
 const TYPE_LABELS = { lecture: 'הרצאה', tutorial: 'תרגול' };
 const TYPE_COLORS = {
-  lecture: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  tutorial: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  lecture: 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border-indigo-500/30',
+  tutorial: 'bg-violet-500/20 text-violet-600 dark:text-violet-300 border-violet-500/30',
 };
 
 export default function Dashboard({
@@ -28,28 +28,23 @@ export default function Dashboard({
   const totalWatched  = courses.reduce((sum, c) => sum + c.watched, 0);
   const globalPct = totalSessions > 0 ? Math.round((totalWatched / totalSessions) * 100) : 0;
 
-  // Union of every week number that exists across all courses
   const allWeeks = useMemo(() => {
     const set = new Set();
     courses.forEach((c) => c.sessions?.forEach((s) => set.add(s.week)));
     return [...set].sort((a, b) => a - b);
   }, [courses]);
 
-  // Weeks where every session across every course is watched
   const completedWeeks = useMemo(() => {
     const done = new Set();
     allWeeks.forEach((week) => {
       const weekSessions = courses.flatMap((c) =>
         (c.sessions ?? []).filter((s) => s.week === week)
       );
-      if (weekSessions.length > 0 && weekSessions.every((s) => s.watched)) {
-        done.add(week);
-      }
+      if (weekSessions.length > 0 && weekSessions.every((s) => s.watched)) done.add(week);
     });
     return done;
   }, [courses, allWeeks]);
 
-  // Per-week stats across all courses
   const weeklyStats = useMemo(() => {
     return allWeeks.map((week) => {
       const weekSessions = courses.flatMap((c) =>
@@ -62,10 +57,8 @@ export default function Dashboard({
     });
   }, [courses, allWeeks]);
 
-  // Build the cross-course session list for filtered views
   const filteredGroups = useMemo(() => {
     if (weekFilter === 'all') return [];
-
     return courses
       .map((course) => {
         const sessions = (course.sessions ?? []).filter((s) => {
@@ -83,15 +76,15 @@ export default function Dashboard({
     <div className="space-y-5">
       {/* Global Stats */}
       {courses.length > 0 && (
-        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-lg">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-gray-200 dark:border-slate-700 shadow-sm dark:shadow-lg">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">התקדמות הסמסטר</h2>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">התקדמות הסמסטר</h2>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
                 {totalWatched} מתוך {totalSessions} שיעורים הושלמו
               </p>
             </div>
-            <div className="text-4xl font-bold text-indigo-400">{globalPct}%</div>
+            <div className="text-4xl font-bold text-indigo-600 dark:text-indigo-400">{globalPct}%</div>
           </div>
           <div className="progress-bar">
             <div
@@ -100,17 +93,17 @@ export default function Dashboard({
             />
           </div>
           <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-            <div className="bg-slate-700/50 rounded-xl p-3">
-              <div className="text-2xl font-bold text-white">{courses.length}</div>
-              <div className="text-xs text-slate-400 mt-0.5">קורסים</div>
+            <div className="bg-gray-100/80 dark:bg-slate-700/50 rounded-xl p-3">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{courses.length}</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">קורסים</div>
             </div>
-            <div className="bg-slate-700/50 rounded-xl p-3">
-              <div className="text-2xl font-bold text-emerald-400">{totalWatched}</div>
-              <div className="text-xs text-slate-400 mt-0.5">הושלמו</div>
+            <div className="bg-gray-100/80 dark:bg-slate-700/50 rounded-xl p-3">
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{totalWatched}</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">הושלמו</div>
             </div>
-            <div className="bg-slate-700/50 rounded-xl p-3">
-              <div className="text-2xl font-bold text-amber-400">{totalSessions - totalWatched}</div>
-              <div className="text-xs text-slate-400 mt-0.5">נותרו</div>
+            <div className="bg-gray-100/80 dark:bg-slate-700/50 rounded-xl p-3">
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{totalSessions - totalWatched}</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">נותרו</div>
             </div>
           </div>
         </div>
@@ -118,20 +111,17 @@ export default function Dashboard({
 
       {/* Weekly progress breakdown */}
       {courses.length > 0 && weeklyStats.length > 0 && (
-        <WeeklyProgress
-          weeklyStats={weeklyStats}
-          onWeekClick={(w) => setWeekFilter(w)}
-        />
+        <WeeklyProgress weeklyStats={weeklyStats} onWeekClick={(w) => setWeekFilter(w)} />
       )}
 
-      {/* Week Picker — sticky below the header, between stats and task center */}
+      {/* Week Picker */}
       {courses.length > 0 && (
-        <div className="sticky top-[69px] z-10 bg-slate-900 py-2">
+        <div className="sticky top-[69px] z-10 bg-gray-50 dark:bg-slate-900 py-2">
           <WeekPicker weeks={allWeeks} value={weekFilter} onChange={setWeekFilter} completedWeeks={completedWeeks} />
         </div>
       )}
 
-      {/* ── Task Center ──────────────────────────────────────────────── */}
+      {/* Task Center */}
       <TodoPanel
         todos={todos}
         courses={courses}
@@ -141,7 +131,7 @@ export default function Dashboard({
         onDeleteTodo={onDeleteTodo}
       />
 
-      {/* ── Content area ─────────────────────────────────────────────── */}
+      {/* Content area */}
       {courses.length === 0 ? (
         <EmptyDashboard onAddCourse={onAddCourse} />
       ) : showFiltered ? (
@@ -154,7 +144,7 @@ export default function Dashboard({
         />
       ) : (
         <div>
-          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-medium text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-4">
             הקורסים שלי
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -177,62 +167,59 @@ export default function Dashboard({
 
 function WeeklyProgress({ weeklyStats, onWeekClick }) {
   const [open, setOpen] = useState(true);
-
   const doneCount = weeklyStats.filter((w) => w.done).length;
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-md overflow-hidden">
-      {/* Header */}
+    <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm dark:shadow-md overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/30 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <span className="font-semibold text-white">התקדמות שבועית</span>
-          <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">
+          <span className="font-semibold text-gray-900 dark:text-white">התקדמות שבועית</span>
+          <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-2 py-0.5 rounded-full">
             {doneCount}/{weeklyStats.length} שבועות הושלמו
           </span>
         </div>
         <svg
-          className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-gray-400 dark:text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
-      {/* Week rows */}
       {open && (
-        <div className="border-t border-slate-700 px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+        <div className="border-t border-gray-200 dark:border-slate-700 px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
           {weeklyStats.map(({ week, watched, total, pct, done }) => (
             <button
               key={week}
               onClick={() => onWeekClick(week)}
               className="group text-right hover:opacity-80 transition-opacity"
             >
-              {/* Label row */}
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5">
                   {done ? (
-                    <span className="text-xs text-emerald-400 font-bold">✓</span>
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
                   ) : (
-                    <span className="text-xs text-slate-500 font-medium">{pct}%</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500 font-medium">{pct}%</span>
                   )}
-                  <span className="text-xs text-slate-500">{watched}/{total}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">{watched}/{total}</span>
                 </div>
-                <span className={`text-sm font-medium group-hover:text-indigo-300 transition-colors ${done ? 'text-emerald-400' : 'text-slate-300'}`}>
+                <span className={`text-sm font-medium group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors ${
+                  done ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-slate-300'
+                }`}>
                   שבוע {week}
                 </span>
               </div>
-              {/* Progress bar */}
-              <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     done
                       ? 'bg-emerald-500'
                       : pct > 0
                       ? 'bg-gradient-to-l from-indigo-500 to-violet-500'
-                      : 'bg-slate-600'
+                      : 'bg-gray-300 dark:bg-slate-600'
                   }`}
                   style={{ width: `${pct}%` }}
                 />
@@ -262,7 +249,7 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
     const scrollable = el.scrollWidth - el.clientWidth;
     if (scrollable <= 0) { setThumbWidth(100); setThumbLeft(0); return; }
     const w = (el.clientWidth / el.scrollWidth) * 100;
-    const scrolled = -el.scrollLeft; // RTL: scrollLeft is negative when scrolled left
+    const scrolled = -el.scrollLeft;
     const ratio = Math.max(0, Math.min(1, scrolled / scrollable));
     setThumbWidth(w);
     setThumbLeft((1 - ratio) * (100 - w));
@@ -325,15 +312,15 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
               className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
                 active
                   ? special
-                    ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                    ? 'bg-amber-500/20 border-amber-500/60 text-amber-600 dark:text-amber-300'
                     : done
                     ? 'bg-emerald-600 border-emerald-600 text-white'
                     : 'bg-indigo-600 border-indigo-600 text-white'
                   : special
-                  ? 'bg-transparent border-amber-500/30 text-amber-400/70 hover:border-amber-500/60 hover:text-amber-300'
+                  ? 'bg-transparent border-amber-500/30 text-amber-500/70 hover:border-amber-500/60 hover:text-amber-600 dark:hover:text-amber-300'
                   : done
-                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                  : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
               }`}
             >
               {special && <span className="ml-1">⚑</span>}
@@ -347,23 +334,21 @@ function WeekPicker({ weeks, value, onChange, completedWeeks = new Set() }) {
       {/* Draggable scroll indicator */}
       <div
         ref={trackRef}
-        className="relative mt-2 h-1.5 bg-slate-700/60 rounded-full cursor-pointer"
+        className="relative mt-2 h-1.5 bg-gray-200/80 dark:bg-slate-700/60 rounded-full cursor-pointer"
         onClick={(e) => {
-          // Click on track → jump scroll to that position
           const el = scrollRef.current;
           const track = trackRef.current;
           if (!el || !track) return;
           const rect = track.getBoundingClientRect();
           const clickRatio = (e.clientX - rect.left) / rect.width;
           const scrollable = el.scrollWidth - el.clientWidth;
-          // RTL: 0 = right (start), 1 = left (end) → invert
           el.scrollLeft = -(1 - clickRatio) * scrollable;
           updateThumb();
         }}
       >
         <div
           className={`absolute top-0 h-full rounded-full transition-[width] duration-150 ${
-            dragging ? 'bg-indigo-400 cursor-grabbing' : 'bg-indigo-500/70 hover:bg-indigo-400 cursor-grab'
+            dragging ? 'bg-indigo-500 cursor-grabbing' : 'bg-indigo-400/70 hover:bg-indigo-500 cursor-grab'
           }`}
           style={{ width: `${thumbWidth}%`, left: `${thumbLeft}%` }}
           onMouseDown={(e) => { e.preventDefault(); startDrag(e.clientX); }}
@@ -380,16 +365,12 @@ function FilteredView({ groups, weekFilter, onSessionToggle, onSessionDelete, on
   if (groups.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="text-4xl mb-3">
-          {weekFilter === 'remaining' ? '🎉' : '✓'}
-        </div>
-        <p className="text-slate-300 font-medium">
-          {weekFilter === 'remaining'
-            ? 'כל המשימות הושלמו!'
-            : `אין שיעורים לשבוע ${weekFilter}`}
+        <div className="text-4xl mb-3">{weekFilter === 'remaining' ? '🎉' : '✓'}</div>
+        <p className="text-gray-600 dark:text-slate-300 font-medium">
+          {weekFilter === 'remaining' ? 'כל המשימות הושלמו!' : `אין שיעורים לשבוע ${weekFilter}`}
         </p>
         {weekFilter === 'remaining' && (
-          <p className="text-slate-500 text-sm mt-1">אין שיעורים שנותרו לצפייה</p>
+          <p className="text-gray-400 dark:text-slate-500 text-sm mt-1">אין שיעורים שנותרו לצפייה</p>
         )}
       </div>
     );
@@ -402,7 +383,7 @@ function FilteredView({ groups, weekFilter, onSessionToggle, onSessionDelete, on
 
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+      <h2 className="text-sm font-medium text-gray-400 dark:text-slate-400 uppercase tracking-wider">
         {heading}
       </h2>
       {groups.map(({ course, sessions }) => (
@@ -428,11 +409,10 @@ function CourseWeekBlock({ course, sessions, onSessionToggle, onSessionDelete, o
 
   return (
     <div
-      className={`bg-slate-800 border rounded-2xl overflow-hidden shadow-sm transition-colors ${
-        allDone ? 'border-emerald-500/30' : 'border-slate-700'
+      className={`bg-white dark:bg-slate-800 border rounded-2xl overflow-hidden shadow-sm transition-colors ${
+        allDone ? 'border-emerald-500/30' : 'border-gray-200 dark:border-slate-700'
       }`}
     >
-      {/* Course header row */}
       <div className="flex items-center px-5 py-3.5">
         <button
           className="flex-1 flex items-center gap-3 text-right"
@@ -440,29 +420,30 @@ function CourseWeekBlock({ course, sessions, onSessionToggle, onSessionDelete, o
         >
           <div
             className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-              allDone ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-300'
+              allDone
+                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'
             }`}
           >
             {allDone ? '✓' : watchedCount}
           </div>
-          <span className="font-semibold text-white text-sm flex-1 text-right">
+          <span className="font-semibold text-gray-900 dark:text-white text-sm flex-1 text-right">
             {course.name}
           </span>
-          <span className="text-xs text-slate-400 flex-shrink-0">
+          <span className="text-xs text-gray-400 dark:text-slate-400 flex-shrink-0">
             {watchedCount}/{sessions.length}
           </span>
           <svg
-            className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-gray-400 dark:text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
-        {/* Navigate into course */}
         <button
           onClick={() => onSelectCourse(course)}
-          className="mr-3 text-slate-500 hover:text-indigo-400 transition-colors flex-shrink-0"
+          className="mr-3 text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-shrink-0"
           title="פתח קורס"
         >
           <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,9 +452,8 @@ function CourseWeekBlock({ course, sessions, onSessionToggle, onSessionDelete, o
         </button>
       </div>
 
-      {/* Session rows */}
       {open && (
-        <div className="border-t border-slate-700 divide-y divide-slate-700/50">
+        <div className="border-t border-gray-200 dark:border-slate-700 divide-y divide-gray-100 dark:divide-slate-700/50">
           {sessions.map((s) => (
             <DashboardSessionRow key={s.id} session={s} onToggle={onSessionToggle} onDelete={onSessionDelete} />
           ))}
@@ -483,7 +463,7 @@ function CourseWeekBlock({ course, sessions, onSessionToggle, onSessionDelete, o
   );
 }
 
-// ── Session row (inline toggle, no navigation needed) ────────────────────────
+// ── Session row ──────────────────────────────────────────────────────────────
 
 function DashboardSessionRow({ session, onToggle, onDelete }) {
   const [pending, setPending] = useState(false);
@@ -507,12 +487,14 @@ function DashboardSessionRow({ session, onToggle, onDelete }) {
   };
 
   return (
-    <label className="flex items-center gap-4 px-5 py-3 cursor-pointer hover:bg-slate-700/30 transition-colors group">
+    <label className="flex items-center gap-4 px-5 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors group">
       <div className="relative flex-shrink-0">
         <input type="checkbox" checked={session.watched} onChange={handleToggle} disabled={pending} className="sr-only" />
         <div
           className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-            session.watched ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500 group-hover:border-slate-400'
+            session.watched
+              ? 'bg-emerald-500 border-emerald-500'
+              : 'bg-transparent border-gray-300 dark:border-slate-500 group-hover:border-gray-400 dark:group-hover:border-slate-400'
           } ${pending ? 'opacity-50' : ''}`}
         >
           {session.watched && (
@@ -526,12 +508,12 @@ function DashboardSessionRow({ session, onToggle, onDelete }) {
         <span className={`text-xs border px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${TYPE_COLORS[session.type]}`}>
           {TYPE_LABELS[session.type]}
         </span>
-        <span className={`text-sm truncate ${session.watched ? 'line-through text-slate-500' : 'text-slate-200'}`}>
+        <span className={`text-sm truncate ${session.watched ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-700 dark:text-slate-200'}`}>
           {TYPE_LABELS[session.type]} {session.number}
         </span>
       </div>
       {session.watched && !confirmDelete && (
-        <span className="text-xs text-emerald-500 flex-shrink-0">✓ נצפה</span>
+        <span className="text-xs text-emerald-600 dark:text-emerald-500 flex-shrink-0">✓ נצפה</span>
       )}
       <button
         type="button"
@@ -539,7 +521,7 @@ function DashboardSessionRow({ session, onToggle, onDelete }) {
         className={`flex-shrink-0 transition-all text-xs rounded-lg px-2 py-0.5 ${
           confirmDelete
             ? 'bg-red-500 text-white'
-            : 'opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400'
+            : 'opacity-0 group-hover:opacity-100 text-gray-400 dark:text-slate-600 hover:text-red-400'
         }`}
         title={confirmDelete ? 'לחץ שוב לאישור' : 'מחק שיעור'}
       >
@@ -559,8 +541,8 @@ function EmptyDashboard({ onAddCourse }) {
   return (
     <div className="text-center py-20">
       <div className="text-6xl mb-4">📚</div>
-      <h2 className="text-xl font-semibold text-slate-300 mb-2">אין קורסים עדיין</h2>
-      <p className="text-slate-500 mb-6">הוסף קורס ראשון כדי להתחיל לעקוב אחר ההתקדמות שלך</p>
+      <h2 className="text-xl font-semibold text-gray-700 dark:text-slate-300 mb-2">אין קורסים עדיין</h2>
+      <p className="text-gray-400 dark:text-slate-500 mb-6">הוסף קורס ראשון כדי להתחיל לעקוב אחר ההתקדמות שלך</p>
       <button
         onClick={onAddCourse}
         className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium transition-colors"

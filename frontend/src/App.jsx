@@ -40,7 +40,26 @@ function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials)
 // ── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  // Auth state: undefined = still checking, null = logged out, object = logged in
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lecture-tracker-theme');
+      return saved !== null ? saved === 'dark' : true; // default dark
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    try { localStorage.setItem('lecture-tracker-theme', isDark ? 'dark' : 'light'); } catch {}
+  }, [isDark]);
+
+  // ── Auth state: undefined = still checking, null = logged out, object = logged in
   const [session, setSession] = useState(undefined);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
@@ -57,16 +76,13 @@ export default function App() {
 
   // ── Auth bootstrap ─────────────────────────────────────────────────────────
   useEffect(() => {
-    // Restore session from localStorage (supabase-js handles this internally)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    // Listen for sign-in / sign-out events (including OAuth redirect callback)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) {
-        // Clear data when user signs out
         setCourses([]);
         setTodos([]);
         setSelectedCourseId(null);
@@ -87,7 +103,6 @@ export default function App() {
   async function loadData() {
     const uid = session.user.id;
 
-    // Fetch all three tables in parallel
     const [
       { data: cRows, error: cErr },
       { data: sRows, error: sErr },
@@ -103,8 +118,6 @@ export default function App() {
       return;
     }
 
-    // Reassemble sessions as nested arrays — all existing components receive
-    // the exact same shape they always have, so no component changes are needed.
     const assembled = (cRows ?? []).map((c) => {
       const sessions = (sRows ?? [])
         .filter((s) => s.course_id === c.id)
@@ -133,7 +146,7 @@ export default function App() {
     setTodos((tRows ?? []).map((t) => ({
       id: t.id,
       description: t.description,
-      linkedCourseId: t.linked_course_id,  // UUID string or null
+      linkedCourseId: t.linked_course_id,
       linkedWeek: t.linked_week,
       done: t.done,
       createdAt: t.created_at,
@@ -147,23 +160,16 @@ export default function App() {
     setAuthError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        // Supabase redirects back here after Google consent.
-        // Works for both localhost:5173 and the production Vercel URL
-        // because both are listed in Supabase → Authentication → URL Configuration.
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: window.location.origin },
     });
     if (error) {
       setAuthError('שגיאה בהתחברות עם Google. נסה שוב.');
       setAuthLoading(false);
     }
-    // On success the browser navigates away — authLoading stays true until redirect
   };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    // onAuthStateChange fires → clears state automatically
   };
 
   // ── Course handlers ────────────────────────────────────────────────────────
@@ -190,11 +196,9 @@ export default function App() {
       watched: 0,
     };
 
-    // Optimistic update — UI feels instant
     setCourses((prev) => [newCourse, ...prev]);
     setShowWizard(false);
 
-    // Insert course row (with explicit id so FK from sessions works immediately)
     const { error: cErr } = await supabase.from('courses').insert({
       id: courseId,
       user_id: userId,
@@ -209,10 +213,9 @@ export default function App() {
       console.error('Failed to create course:', cErr);
       setCourses((prev) => prev.filter((c) => c.id !== courseId));
       setShowWizard(true);
-      throw cErr; // CourseWizard catches this and shows a Hebrew error message
+      throw cErr;
     }
 
-    // Bulk-insert all sessions
     const sessionRows = sessions.map((s) => ({
       id: s.id,
       user_id: userId,
@@ -235,15 +238,13 @@ export default function App() {
   };
 
   const handleDeleteCourse = async (id) => {
-    // Optimistic update
     setCourses((prev) => prev.filter((c) => c.id !== id));
     if (selectedCourseId === id) setSelectedCourseId(null);
 
-    // FK ON DELETE CASCADE removes sessions automatically
     const { error } = await supabase.from('courses').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete course:', error);
-      loadData(); // restore state
+      loadData();
     }
   };
 
@@ -259,18 +260,14 @@ export default function App() {
       week: Number(week),
       type,
       watched: false,
-      number: 0, // placeholder
+      number: 0,
     };
 
-    // Deep copy references simply for sorting
     const typeSessions = course.sessions.filter((s) => s.type === type).map((s) => ({ ...s }));
     typeSessions.push(newSession);
 
-    // Sort to determine new sequence
     typeSessions.sort((a, b) => {
-      // 1. Sort by week
       if (a.week !== b.week) return a.week - b.week;
-      // 2. Within same week, new session goes to the end
       const aNum = a.id === newSession.id ? Infinity : a.number;
       const bNum = b.id === newSession.id ? Infinity : b.number;
       return aNum - bNum;
@@ -278,7 +275,6 @@ export default function App() {
 
     const sessionsToUpdateInDb = [];
 
-    // Assign sequential numbers
     typeSessions.forEach((s, idx) => {
       const newNum = idx + 1;
       if (s.id === newSession.id) {
@@ -288,28 +284,19 @@ export default function App() {
       }
     });
 
-    // Optimistic update
     setCourses((prev) =>
       prev.map((c) => {
         if (c.id !== courseId) return c;
-        
-        // Build updated sessions array with incremented numbers
         const updatedSessions = c.sessions.map((oldS) => {
           const changed = sessionsToUpdateInDb.find((u) => u.id === oldS.id);
           if (changed) return { ...oldS, number: changed.number };
           return oldS;
         });
         updatedSessions.push(newSession);
-
-        return {
-          ...c,
-          sessions: updatedSessions,
-          total: updatedSessions.length,
-        };
+        return { ...c, sessions: updatedSessions, total: updatedSessions.length };
       })
     );
 
-    // 1. Insert new session to DB
     const { error: insErr } = await supabase.from('sessions').insert({
       id: newSession.id,
       user_id: session.user.id,
@@ -322,21 +309,20 @@ export default function App() {
 
     if (insErr) {
       console.error('Failed to add extra session:', insErr);
-      loadData(); // revert
+      loadData();
       return;
     }
 
-    // 2. Multi-update the shifted sessions in DB
     if (sessionsToUpdateInDb.length > 0) {
-      const updatePromises = sessionsToUpdateInDb.map((u) =>
-        supabase.from('sessions').update({ number: u.number }).eq('id', u.id)
+      await Promise.all(
+        sessionsToUpdateInDb.map((u) =>
+          supabase.from('sessions').update({ number: u.number }).eq('id', u.id)
+        )
       );
-      await Promise.all(updatePromises);
     }
   };
 
   const handleSessionToggle = async (sessionId, watched) => {
-    // Optimistic update
     setCourses((prev) =>
       prev.map((c) => {
         const idx = c.sessions.findIndex((s) => s.id === sessionId);
@@ -355,7 +341,6 @@ export default function App() {
 
     if (error) {
       console.error('Failed to toggle session:', error);
-      // Revert
       setCourses((prev) =>
         prev.map((c) => {
           const idx = c.sessions.findIndex((s) => s.id === sessionId);
@@ -370,17 +355,11 @@ export default function App() {
   };
 
   const handleDeleteSession = async (sessionId) => {
-    // Optimistic update
     setCourses((prev) =>
       prev.map((c) => {
         const sessions = c.sessions.filter((s) => s.id !== sessionId);
         if (sessions.length === c.sessions.length) return c;
-        return {
-          ...c,
-          sessions,
-          total: sessions.length,
-          watched: sessions.filter((s) => s.watched).length,
-        };
+        return { ...c, sessions, total: sessions.length, watched: sessions.filter((s) => s.watched).length };
       })
     );
 
@@ -394,12 +373,10 @@ export default function App() {
   // ── Todo handlers ──────────────────────────────────────────────────────────
 
   const handleAddTodo = async ({ description, linkedCourseId, linkedWeek }) => {
-    // linkedCourseId arrives as a UUID string (or null/empty string)
     const courseId = linkedCourseId || null;
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
 
-    // Optimistic update
     setTodos((prev) => [
       ...prev,
       { id, description, linkedCourseId: courseId, linkedWeek: linkedWeek ?? null, done: false, createdAt },
@@ -465,16 +442,14 @@ export default function App() {
 
   // ── Render guards ──────────────────────────────────────────────────────────
 
-  // Still checking localStorage for existing session → show spinner
   if (session === undefined) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // No session → show login
   if (!session) {
     return <LoginPage onSignIn={handleSignIn} loading={authLoading} error={authError} />;
   }
@@ -482,15 +457,16 @@ export default function App() {
   // ── Authenticated app ──────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-10 shadow-md">
+      <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10 shadow-sm dark:shadow-md">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          {/* RTL start (physical right): back button + title */}
           <div className="flex items-center gap-3">
             {selectedCourse && (
               <button
                 onClick={() => setSelectedCourseId(null)}
-                className="text-slate-400 hover:text-white transition-colors p-1 rounded"
+                className="text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors p-1 rounded"
               >
                 <svg className="w-5 h-5 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -498,7 +474,7 @@ export default function App() {
               </button>
             )}
             <div>
-              <h1 className="text-xl font-bold text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                 {selectedCourse
                   ? selectedCourse.name
                   : view === 'todos'
@@ -506,40 +482,64 @@ export default function App() {
                     : 'מעקב הרצאות ותרגולים'}
               </h1>
               {selectedCourse && (
-                <p className="text-xs text-slate-400">חזרה ללוח הבקרה</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">חזרה ללוח הבקרה</p>
               )}
             </div>
           </div>
 
-          {!selectedCourse && (
-            <div className="hidden sm:flex items-center gap-2">
-              <button
-                onClick={() => setShowWizard(true)}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                הוסף קורס
-              </button>
-              {/* Sign-out button — shows user email as tooltip */}
-              <button
-                onClick={handleSignOut}
-                title={session.user.email}
-                className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-2 rounded-lg text-sm transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* RTL end (physical left): theme toggle + desktop actions */}
+          <div className="flex items-center gap-2">
+            {/* Theme toggle — always visible */}
+            <button
+              onClick={() => setIsDark((d) => !d)}
+              title={isDark ? 'מצב בהיר' : 'מצב כהה'}
+              className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              {isDark ? (
+                /* Sun icon */
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                יציאה
-              </button>
-            </div>
-          )}
+              ) : (
+                /* Moon icon */
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+
+            {/* Desktop-only action buttons */}
+            {!selectedCourse && (
+              <div className="hidden sm:flex items-center gap-2">
+                <button
+                  onClick={() => setShowWizard(true)}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  הוסף קורס
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  title={session.user.email}
+                  className="flex items-center gap-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-lg text-sm transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  יציאה
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* Main — extra bottom padding so content clears the nav bar */}
+      {/* Main */}
       <main className="max-w-6xl mx-auto px-4 py-6 pb-24">
         {selectedCourse ? (
           <CourseDetail
@@ -582,7 +582,6 @@ export default function App() {
         onTodos={handleNavTodos}
       />
 
-      {/* Wizard Modal */}
       {showWizard && (
         <CourseWizard
           onSubmit={handleCreateCourse}
@@ -597,16 +596,17 @@ export default function App() {
 
 function BottomNav({ tab, onHome, onAdd, onTodos }) {
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-20 bg-slate-800/95 backdrop-blur border-t border-slate-700 shadow-2xl">
+    <nav className="fixed bottom-0 inset-x-0 z-20 bg-white/95 dark:bg-slate-800/95 backdrop-blur border-t border-gray-200 dark:border-slate-700 shadow-2xl">
       <div className="max-w-6xl mx-auto flex items-center justify-around h-16 px-4">
 
         {/* ראשי */}
         <button
           onClick={onHome}
-          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${tab === 'home' || tab === 'course'
-              ? 'text-indigo-400'
-              : 'text-slate-500 hover:text-slate-300'
-            }`}
+          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${
+            tab === 'home' || tab === 'course'
+              ? 'text-indigo-600 dark:text-indigo-400'
+              : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
+          }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -615,7 +615,7 @@ function BottomNav({ tab, onHome, onAdd, onTodos }) {
           <span className="text-xs font-medium">ראשי</span>
         </button>
 
-        {/* הוסף — center action button */}
+        {/* הוסף */}
         <button
           onClick={onAdd}
           className="flex flex-col items-center gap-1 -mt-5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white w-14 h-14 rounded-full shadow-lg shadow-indigo-500/30 transition-colors flex items-center justify-center"
@@ -629,10 +629,11 @@ function BottomNav({ tab, onHome, onAdd, onTodos }) {
         {/* משימות */}
         <button
           onClick={onTodos}
-          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${tab === 'todos'
-              ? 'text-amber-400'
-              : 'text-slate-500 hover:text-slate-300'
-            }`}
+          className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${
+            tab === 'todos'
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
+          }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

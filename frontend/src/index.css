@@ -3,26 +3,28 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --scrollbar-track: #f1f5f9;
+    --scrollbar-thumb: #cbd5e1;
+  }
+  .dark {
+    --scrollbar-track: #1e293b;
+    --scrollbar-thumb: #475569;
+  }
+
   body {
     font-family: 'Heebo', 'Segoe UI', Arial, sans-serif;
     direction: rtl;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #1e293b;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #475569;
-    border-radius: 3px;
-  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 }
 
 @layer components {
   .progress-bar {
-    @apply h-2 rounded-full bg-slate-700 overflow-hidden;
+    @apply h-2 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden;
   }
   .progress-fill {
     @apply h-full rounded-full transition-all duration-500;
