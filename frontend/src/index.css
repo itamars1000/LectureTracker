@@ -15,6 +15,9 @@
   body {
     font-family: 'Heebo', 'Segoe UI', Arial, sans-serif;
     direction: rtl;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.65;
   }
 
   ::-webkit-scrollbar { width: 6px; }

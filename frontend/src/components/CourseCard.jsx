@@ -117,7 +117,7 @@ export default function CourseCard({ course, onClick, onDelete, onEdit }) {
       )}
 
       {/* Course name — pl-6 clears the delete button */}
-      <h3 className={`text-base font-semibold mb-1 transition-colors line-clamp-2 pl-6
+      <h3 className={`text-base font-bold mb-1 transition-colors line-clamp-2 pl-6 tracking-tight
         text-gray-900 dark:text-white ${color.hoverText}`}
       >
         {course.name}

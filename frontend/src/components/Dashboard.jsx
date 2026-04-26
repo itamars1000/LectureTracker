@@ -80,12 +80,12 @@ export default function Dashboard({
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-gray-200 dark:border-slate-700 shadow-sm dark:shadow-lg">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">התקדמות הסמסטר</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">התקדמות הסמסטר</h2>
               <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
                 {totalWatched} מתוך {totalSessions} שיעורים הושלמו
               </p>
             </div>
-            <div className="text-4xl font-bold text-indigo-600 dark:text-indigo-400">{globalPct}%</div>
+            <div className="text-5xl font-black text-indigo-600 dark:text-indigo-400 tracking-tight">{globalPct}%</div>
           </div>
           <div className="progress-bar">
             <div
@@ -95,16 +95,16 @@ export default function Dashboard({
           </div>
           <div className="mt-4 grid grid-cols-3 gap-4 text-center">
             <div className="bg-gray-100/80 dark:bg-slate-700/50 rounded-xl p-3">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{courses.length}</div>
-              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">קורסים</div>
+              <div className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">{courses.length}</div>
+              <div className="text-xs font-medium text-gray-400 dark:text-slate-500 mt-0.5">קורסים</div>
             </div>
             <div className="bg-gray-100/80 dark:bg-slate-700/50 rounded-xl p-3">
-              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{totalWatched}</div>
-              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">הושלמו</div>
+              <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">{totalWatched}</div>
+              <div className="text-xs font-medium text-gray-400 dark:text-slate-500 mt-0.5">הושלמו</div>
             </div>
             <div className="bg-gray-100/80 dark:bg-slate-700/50 rounded-xl p-3">
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{totalSessions - totalWatched}</div>
-              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">נותרו</div>
+              <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">{totalSessions - totalWatched}</div>
+              <div className="text-xs font-medium text-gray-400 dark:text-slate-500 mt-0.5">נותרו</div>
             </div>
           </div>
         </div>

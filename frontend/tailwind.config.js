@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Segoe UI', 'Arial', 'sans-serif'],
+        sans: ['Heebo', 'Segoe UI', 'Arial', 'sans-serif'],
       },
     },
   },

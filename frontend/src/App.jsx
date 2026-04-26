@@ -115,7 +115,7 @@ export default function App() {
               </button>
             )}
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
                 {selectedCourse
                   ? selectedCourse.name
                   : view === 'todos'
