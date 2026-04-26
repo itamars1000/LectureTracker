@@ -1,12 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Builds the flat session list for a new course before it reaches the DB.
- * Session numbers are continuous across all weeks per type (not reset per week).
- */
 function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials) {
   const sessions = [];
   let lectureNum = 1;
@@ -36,7 +32,6 @@ function generateSessions(courseId, totalWeeks, weeklyLectures, weeklyTutorials)
   return sessions;
 }
 
-/** Maps a DB row pair (course + its sessions) to the camelCase in-memory shape. */
 function assembleCourse(c, sRows) {
   const sessions = sRows
     .filter((s) => s.course_id === c.id)
@@ -63,28 +58,23 @@ function assembleCourse(c, sRows) {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-/**
- * Manages the courses + sessions state for the authenticated user.
- *
- * @param {string | null | undefined} userId  – from session?.user?.id
- *
- * Auto-loads on mount when userId is truthy.
- * Auto-clears when userId becomes falsy (logout).
- *
- * All mutations follow optimistic update → DB write → revert on error.
- *
- * Returns isLoading: true from the moment userId is set until the first
- * successful fetch completes, so callers can show a skeleton.
- */
 export function useCourses(userId) {
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Tracks whether the initial fetch has completed at least once.
+  // Used to suppress the loading skeleton on realtime / error-recovery reloads —
+  // those should be silent background refreshes, not full skeleton flashes.
+  const hasLoaded = useRef(false);
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
   const loadCourses = useCallback(async () => {
     if (!userId) return;
-    setIsLoading(true);
+
+    // Only show the skeleton on the very first load (or after a logout reset).
+    if (!hasLoaded.current) setIsLoading(true);
+
     const [
       { data: cRows, error: cErr },
       { data: sRows, error: sErr },
@@ -104,8 +94,11 @@ export function useCourses(userId) {
     }
 
     setCourses((cRows ?? []).map((c) => assembleCourse(c, sRows ?? [])));
+    hasLoaded.current = true;
     setIsLoading(false);
   }, [userId]);
+
+  // ── Initial load + cleanup on logout ───────────────────────────────────────
 
   useEffect(() => {
     if (userId) {
@@ -113,15 +106,47 @@ export function useCourses(userId) {
     } else {
       setCourses([]);
       setIsLoading(false);
+      hasLoaded.current = false; // next login will show skeleton again
     }
+  }, [userId, loadCourses]);
+
+  // ── Realtime subscription ───────────────────────────────────────────────────
+  // Listens for any INSERT / UPDATE / DELETE on the courses and sessions tables
+  // for this user. When a change arrives (e.g. from another tab or device),
+  // re-fetches data silently — no skeleton, no flicker.
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`courses-realtime-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'courses',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => loadCourses(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sessions',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => loadCourses(),
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, [userId, loadCourses]);
 
   // ── Create ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Creates a new course + all its sessions.
-   * Throws on DB error so the caller (CourseWizard) can show an error message.
-   */
   const createCourse = async (formData) => {
     const courseId = crypto.randomUUID();
     const sessions = generateSessions(
@@ -144,7 +169,6 @@ export function useCourses(userId) {
       watched: 0,
     };
 
-    // Optimistic
     setCourses((prev) => [newCourse, ...prev]);
 
     const { error: cErr } = await supabase.from('courses').insert({
@@ -183,14 +207,6 @@ export function useCourses(userId) {
 
   // ── Update (edit) ───────────────────────────────────────────────────────────
 
-  /**
-   * Updates an existing course.
-   * - Name-only change: updates the name in-place, no progress reset.
-   * - Structure change (weeks / lectures / tutorials): deletes all existing
-   *   sessions and regenerates them from scratch (progress is reset).
-   *   CourseWizard already warns the user about this before they submit.
-   * Throws on DB error so CourseWizard can show an error message.
-   */
   const updateCourse = async (courseId, formData) => {
     const course = courses.find((c) => c.id === courseId);
     if (!course) return;
@@ -208,7 +224,6 @@ export function useCourses(userId) {
         formData.weeklyTutorials,
       );
 
-      // Optimistic
       setCourses((prev) =>
         prev.map((c) =>
           c.id !== courseId
@@ -226,7 +241,6 @@ export function useCourses(userId) {
         ),
       );
 
-      // DB: update course row
       const { error: updateErr } = await supabase
         .from('courses')
         .update({
@@ -237,13 +251,8 @@ export function useCourses(userId) {
         })
         .eq('id', courseId);
 
-      if (updateErr) {
-        loadCourses();
-        throw updateErr;
-      }
+      if (updateErr) { loadCourses(); throw updateErr; }
 
-      // DB: replace sessions (ON DELETE CASCADE would handle this too, but
-      // we delete explicitly to avoid relying on DB-side cascade timing)
       await supabase.from('sessions').delete().eq('course_id', courseId);
 
       const { error: insErr } = await supabase.from('sessions').insert(
@@ -258,12 +267,8 @@ export function useCourses(userId) {
         })),
       );
 
-      if (insErr) {
-        loadCourses();
-        throw insErr;
-      }
+      if (insErr) { loadCourses(); throw insErr; }
     } else {
-      // Name-only change
       setCourses((prev) =>
         prev.map((c) => (c.id !== courseId ? c : { ...c, name: formData.name })),
       );
@@ -273,10 +278,7 @@ export function useCourses(userId) {
         .update({ name: formData.name })
         .eq('id', courseId);
 
-      if (error) {
-        loadCourses();
-        throw error;
-      }
+      if (error) { loadCourses(); throw error; }
     }
   };
 
@@ -349,10 +351,6 @@ export function useCourses(userId) {
 
   // ── Add extra session ───────────────────────────────────────────────────────
 
-  /**
-   * Inserts an extra session for a given course/week/type and renumbers
-   * the other sessions of the same type so they remain contiguous.
-   */
   const addExtraSession = async (courseId, week, type) => {
     const course = courses.find((c) => c.id === courseId);
     if (!course) return;
@@ -387,7 +385,6 @@ export function useCourses(userId) {
       }
     });
 
-    // Optimistic
     setCourses((prev) =>
       prev.map((c) => {
         if (c.id !== courseId) return c;

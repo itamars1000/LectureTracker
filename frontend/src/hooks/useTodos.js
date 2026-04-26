@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 /**
@@ -12,16 +12,24 @@ import { supabase } from '../lib/supabase.js';
  * All mutations follow optimistic update → DB write → revert on error.
  *
  * Returns isLoading: true until the first successful fetch completes.
+ * Subscribes to Supabase Realtime so changes from other tabs/devices
+ * are reflected automatically without a page refresh.
  */
 export function useTodos(userId) {
   const [todos, setTodos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Tracks whether the initial fetch has completed at least once.
+  // Realtime-triggered reloads are silent — no skeleton flash.
+  const hasLoaded = useRef(false);
+
   // ── Load ────────────────────────────────────────────────────────────────────
 
   const loadTodos = useCallback(async () => {
     if (!userId) return;
-    setIsLoading(true);
+
+    if (!hasLoaded.current) setIsLoading(true);
+
     const { data, error } = await supabase
       .from('todos')
       .select('*')
@@ -44,8 +52,11 @@ export function useTodos(userId) {
         createdAt: t.created_at,
       })),
     );
+    hasLoaded.current = true;
     setIsLoading(false);
   }, [userId]);
+
+  // ── Initial load + cleanup on logout ───────────────────────────────────────
 
   useEffect(() => {
     if (userId) {
@@ -53,7 +64,32 @@ export function useTodos(userId) {
     } else {
       setTodos([]);
       setIsLoading(false);
+      hasLoaded.current = false;
     }
+  }, [userId, loadTodos]);
+
+  // ── Realtime subscription ───────────────────────────────────────────────────
+  // Listens for any INSERT / UPDATE / DELETE on the todos table for this user.
+  // When a change arrives from another tab or device, re-fetches silently.
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`todos-realtime-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'todos',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => loadTodos(),
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, [userId, loadTodos]);
 
   // ── Add ─────────────────────────────────────────────────────────────────────
