@@ -1,26 +1,61 @@
+const FEATURES = [
+  { emoji: '📖', text: 'מעקב שיעורים ותרגולים לפי שבוע' },
+  { emoji: '✅', text: 'ניהול משימות מקושרות לקורסים' },
+  { emoji: '☁️', text: 'סנכרון בענן בין כל המכשירים' },
+];
+
 export default function LoginPage({ onSignIn, loading, error }) {
   return (
     <div
-      className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-4"
+      className="min-h-screen relative flex flex-col items-center justify-center p-6 overflow-hidden"
       dir="rtl"
     >
-      <div className="w-full max-w-sm">
-        {/* App branding */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4">📚</div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">מעקב הרצאות ותרגולים</h1>
-          <p className="text-gray-500 dark:text-slate-400 text-sm">עקוב אחר ההתקדמות שלך בכל קורס</p>
-        </div>
+      {/* Background */}
+      <div className="absolute inset-0 bg-white dark:bg-slate-900" />
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-white dark:from-indigo-950/50 dark:via-slate-900 dark:to-slate-900 pointer-events-none" />
 
-        {/* Login card */}
-        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 shadow-lg dark:shadow-2xl space-y-5">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">כניסה לחשבון</h2>
-            <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">הנתונים שלך מסונכרנים בענן</p>
+      {/* Decorative glow — top centre */}
+      <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[480px] h-[320px] bg-indigo-500/10 dark:bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-sm relative z-10 flex flex-col gap-10">
+
+        {/* ── Branding ─────────────────────────────────────────────────────── */}
+        <div className="text-center flex flex-col items-center gap-5">
+          {/* App icon */}
+          <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/25 flex items-center justify-center shadow-sm">
+            <span className="text-4xl select-none">📚</span>
           </div>
 
+          <div>
+            <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
+              מעקב הרצאות
+            </h1>
+            <h1 className="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tight leading-snug">
+              ותרגולים
+            </h1>
+            <p className="text-gray-500 dark:text-slate-400 text-sm mt-3 leading-relaxed">
+              עקוב אחר ההתקדמות שלך בכל קורס בסמסטר
+            </p>
+          </div>
+        </div>
+
+        {/* ── Feature list ──────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-3">
+          {FEATURES.map(({ emoji, text }) => (
+            <div
+              key={text}
+              className="flex items-center gap-3 bg-gray-50/80 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/60 rounded-2xl px-4 py-3"
+            >
+              <span className="text-xl flex-shrink-0 select-none">{emoji}</span>
+              <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">{text}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Sign-in ───────────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-3">
           {error && (
-            <div className="text-sm text-red-500 bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-3">
+            <div className="text-sm text-red-500 bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-3 text-center">
               {error}
             </div>
           )}
@@ -29,7 +64,7 @@ export default function LoginPage({ onSignIn, loading, error }) {
           <button
             onClick={onSignIn}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed text-gray-800 font-medium py-3 px-4 rounded-xl transition-colors shadow-sm border border-gray-200"
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 active:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed text-gray-800 font-semibold py-3.5 px-4 rounded-2xl transition-all shadow-md hover:shadow-lg border border-gray-200"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin flex-shrink-0" />
@@ -45,11 +80,10 @@ export default function LoginPage({ onSignIn, loading, error }) {
           </button>
 
           <p className="text-xs text-gray-400 dark:text-slate-500 text-center leading-relaxed">
-            בכניסה אתה מסכים לתנאי השימוש.
-            <br />
-            הנתונים שלך שמורים בצורה מאובטחת.
+            הנתונים שלך שמורים בצורה מאובטחת
           </p>
         </div>
+
       </div>
     </div>
   );
