@@ -329,11 +329,37 @@ export function useCourses(userId) {
 
   // ── Delete session ──────────────────────────────────────────────────────────
 
+  /**
+   * Deletes a session and renumbers subsequent sessions of the same type
+   * so the numbering stays contiguous (no gaps).
+   * Example: deleting lecture 2 of [1,2,3,4] → [1,2,3]
+   */
   const deleteSession = async (sessionId) => {
+    // Find the session and its parent course before touching state.
+    let deleted = null;
+    let parentCourseId = null;
+    for (const c of courses) {
+      const s = c.sessions.find((s) => s.id === sessionId);
+      if (s) { deleted = s; parentCourseId = c.id; break; }
+    }
+    if (!deleted) return;
+
+    // Sessions of the same type that come after the deleted one need renumbering.
+    const toRenumber = courses
+      .find((c) => c.id === parentCourseId)
+      ?.sessions.filter((s) => s.type === deleted.type && s.number > deleted.number) ?? [];
+
+    // Optimistic: remove session + decrement numbers of affected sessions.
     setCourses((prev) =>
       prev.map((c) => {
-        const sessions = c.sessions.filter((s) => s.id !== sessionId);
-        if (sessions.length === c.sessions.length) return c;
+        if (c.id !== parentCourseId) return c;
+        const sessions = c.sessions
+          .filter((s) => s.id !== sessionId)
+          .map((s) =>
+            s.type === deleted.type && s.number > deleted.number
+              ? { ...s, number: s.number - 1 }
+              : s,
+          );
         return {
           ...c,
           sessions,
@@ -342,10 +368,22 @@ export function useCourses(userId) {
         };
       }),
     );
+
+    // DB: delete the session.
     const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
     if (error) {
       console.error('deleteSession error:', error);
       loadCourses();
+      return;
+    }
+
+    // DB: renumber the affected sessions.
+    if (toRenumber.length > 0) {
+      await Promise.all(
+        toRenumber.map((s) =>
+          supabase.from('sessions').update({ number: s.number - 1 }).eq('id', s.id),
+        ),
+      );
     }
   };
 
